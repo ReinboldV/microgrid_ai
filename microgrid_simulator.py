@@ -10,125 +10,160 @@ Les contraints sont: 1- Eviter l'injecter énergie sur le réseau (Cinject_grid)
 """
 import numpy as np
 from actions import *
+import pandas as pd
 
+#%% 
 class MicrogridSimulator:
 
-    def __init__(self, dP, n_SOC, n_pmax, Cbatful, Cinject_grid, Cbat_empty , Cgrid_use  , Cbat_use ):
-
-        self.Cgrid_use =Cgrid_use 
-        self.Cbat_use=Cbat_use
-        self.dP = dP                                          # Power increment
+    def __init__(self,n_Time, Pnet_ini, SOC_ini, Temp_ini, Pnet, SoC,n_Pnet,n_SoC, dp, SoC_min, Pnet_min, DT, 
+                              Cbatful, C_PV_shed, Cbat_empty, Cgrid_use_Creuse, Cgrid_use_plaine, Cbat_use):
+        
+        self.Cgrid_use_Creuse = Cgrid_use_Creuse
+        self.Cgrid_use_plaine = Cgrid_use_plaine
+        self.Cbat_use = Cbat_use                              # Penalty coefficient       
         self.Cbatful = Cbatful                                # Penalty coefficient
-        self.Cinject_grid = Cinject_grid                      # Penalty coefficient
+        self.C_PV_shed = C_PV_shed                            # Penalty coefficient
         self.Cbat_empty = Cbat_empty                          # Penalty coefficient
-        self.Pgrid=0
-        self.n_SOC = n_SOC                                    # number of battery states
-        self.SOC = np.arange(self.n_SOC)*dP
+
+        self.n_Pnet = n_Pnet
+        self.n_SoC = n_SoC
+        self.dp = dp
+        self.DT = DT
+        self.Pnet_min = Pnet_min
+        self.SoC_min = SoC_min        
+        self.SoC = SoC
+        self.Pnet = Pnet  
+        self.SOC_ini = SOC_ini
+        self.Pnet_ini = Pnet_ini
+        self.Temp_ini = Temp_ini
         
-        self.n_Pnet = 2*n_pmax+1                              # number of power levels (power ranges between -n_power*dP and +n_power*dP)
-        self.Pnet = np.arange(-n_pmax,n_pmax+1)*dP
+        self.n_Time = n_Time
+        self.Time = self.DT * np.arange(self.n_Time)
+
+        SoC2 = np.repeat(self.SoC, len(self.Pnet))
+        self.state_SOC = pd.Series(SoC2)
         
-        self.n_state = self.n_SOC*self.n_Pnet
-        self.state_SOC = np.zeros(self.n_state)
-        self.state_Pnet = np.zeros(self.n_state)
-       
-        state = 0
-        for i in range(self.n_SOC) :
-            for j in range(self.n_Pnet) :
-                self.state_SOC[state] = self.SOC[i]
-                self.state_Pnet[state] = self.Pnet[j]
-                state += 1
-        print(self.state_SOC)
-        print(self.state_Pnet)
-                
-        i_ini, j_ini = self.n_SOC//2, n_pmax
-        self.state_ini = self.n_Pnet*i_ini + j_ini
-              
-        self.state = self.state_ini  # Point de départ 
-        self.i = i_ini
-        self.j = j_ini
-#        i_ini, j_ini= 0, 0
-#        self.state_ini=0
- 
+        self.state_Pnet = pd.Series(self.Pnet)
+        self.state_Pnet = [self.state_Pnet]*(len(self.SoC))
+        self.state_Pnet = pd.concat(self.state_Pnet, ignore_index=True)
+        
+        self.env1 = pd.DataFrame({'state_SOC':self.state_SOC,'state_Pnet':self.state_Pnet})
+        self.env1 = [self.env1]*(self.n_Time)
+        self.env1 = pd.concat(self.env1 , ignore_index=True) 
+        
+        self.temp1 = np.arange(self.n_Time)
+        self.temp1 = np.repeat(self.temp1, (len(self.SoC)*len(self.Pnet)))
+        self.temp1 = pd.Series(self.temp1)
+        self.temp1 = pd.DataFrame({'temps':self.temp1})
+        
+        self.tarif = pd.DataFrame({ 'Tarif' : ['HC','HC','HC','HC','HC','HC','HP','HP','HP','HP','HP','HP','HP','HP','HP','HP','HP','HP','HP','HP','HP','HP','HC','HC']})
+        self.tarif = pd.DataFrame(np.repeat(self.tarif.values,int(round(self.n_Time / 24)),axis=0))
+        self.tarif = pd.DataFrame(np.repeat(self.tarif.values,(len(self.SoC) * len(self.Pnet)),axis=0))
+        self.tarif.columns = ['Tarif']
+        
+        self.env = pd.concat([self.temp1 , self.env1], axis=1)
+        self.env = pd.concat([self.env   , self.tarif],axis=1)
+#        print('env = ', self.env)
+         
+        i_time = int(round(self.Temp_ini / self.DT))
+        i_soc  = int(round((self.SOC_ini - self.SoC_min) / self.dp))
+        i_Pnet = int(round((self.Pnet_ini - self.Pnet_min) / self.dp))
+        
+        self.index_ini = self.n_Pnet * (i_time * self.n_SoC + i_soc) + i_Pnet
+        
+
+        self.index_state = self.index_ini 
 ##################################################################################################################################       
-# Verifier les contraints et recevoir le pénalité et la nouvel situation de l'agent: 
+#%% Verifier les contraints et recevoir le pénalité et la nouvel situation de l'agent: 
 
     def take_action(self, action, Pnet1):
-       
-        SOC = self.state_SOC[self.state]                     # Current SOC
+        
+#        T = self.env.at[self.index_state,'temps']
+#        SOC = self.env.at[self.index_state,'state_SOC']                     # Return the Current SOC
+        
+        i_Pnet2 = self.index_state  % self.n_Pnet
+        residu = self.index_state // self.n_Pnet
+        i_soc2 = residu % self.n_SoC
+        i_time2 = residu // self.n_SoC
+        T = self.Time[i_time2]
+        SOC = self.SoC[i_soc2]    # Return the Current SOC
+        
         reward = 100
-        Pgrid=0
-        Pprod_shed=0
-        Pcons_unsatisfied=0
+        Pgrid = 0
+        Pprod_shed = 0
+        Pcons_unsatisfied = 0
+        
         if action == GRID_ON :                               # Grid connexion ON
             SOC1 = SOC                                       # Battery SOC unchanged
-            Pgrid = self.state_Pnet[self.state]
             
-            reward = -self.Cgrid_use *Pgrid
+#            Pgrid = self.env.at[self.index_state,'state_Pnet']
+            Pgrid = self.Pnet[i_Pnet2]
+            
+            if (self.env.at[self.index_state,'Tarif'] == 'HP'):
+                reward = -self.Cgrid_use_plaine*Pgrid
+            else :
+                reward = -self.Cgrid_use_Creuse*Pgrid
+
             # A prévoir ici : reward fonction de Pgrid (penalité si Pgrid<0)
             if Pgrid<0 : 
-                reward = self.Cinject_grid*Pgrid            #(negative value)
+                reward = self.C_PV_shed*Pgrid            #(negative value)
                 Pprod_shed = Pgrid
-                Pgrid=0
+                Pgrid = 0
             
         elif action == GRID_OFF:                            # Grid connexion OFF
-#            Pbatt = Pnet1 
-            Pbatt = self.state_Pnet[self.state]             # Charge or discharge battery according to the sign of Pnet
-            SOC1 = SOC - Pbatt                              # e niveau de charge de la batterie
+#            Pbatt = self.env.at[self.index_state,'state_Pnet']             # Charge or discharge battery according to the sign of Pnet
+            Pbatt = self.Pnet[i_Pnet2]                                      # Charge or discharge battery according to the sign of Pnet
+            
+            SOC1 = SOC - Pbatt                              # Le niveau de charge de la batterie
             reward = -self.Cbat_use*Pbatt                              
                
             # A prévoir ici : reward fonction for Pprod_shed               
-            if  SOC1 > self.SOC[-1] :                       # Battery too full, cannot absorb Pnet
-                Pnet_actual = SOC1 - self.SOC[-1]           # Pnet actually stored
-                SOC1 = self.SOC[-1]                         # Battery state of charge limitation
+            if  SOC1 > self.SoC[-1] :                       # Battery too full, cannot absorb Pnet
+                Pnet_actual = SOC1 - self.SoC[-1]           # Pnet actually stored
+                SOC1 = self.SoC[-1]                         # Battery state of charge limitation
                 Pprod_shed = - Pnet_actual                  # Loss of production (negative value)
                 reward = self.Cbatful*Pprod_shed
                 
             # A prévoir ici : reward fonction de Pnet_unsatisfied
-            if SOC1 < self.SOC[0] :                        # Not enough energy in the battery to provide Pnet
-                Pnet_actual = SOC1 - self.SOC[0]           # Pnet actually need 
-                SOC1 = self.SOC[0]                         # Battery state of charge limitation
+            if SOC1 < self.SoC[0] :                        # Not enough energy in the battery to provide Pnet
+                Pnet_actual = SOC1 - self.SoC[0]           # Pnet actually need 
+                SOC1 = self.SoC[0]                         # Battery state of charge limitation
                 Pcons_unsatisfied = Pnet_actual            # Unsatisfied consumption (negative value)
                 reward = self.Cbat_empty*Pcons_unsatisfied
-
-        state1 = self.set_state(SOC1,Pnet1)
-        return state1, reward, Pgrid, Pprod_shed, Pcons_unsatisfied
+                
+        T = (T+1)//self.n_Time
+        
+        index_state_1 = self.set_state ( SOC1 , Pnet1, T )
+        
+        return index_state_1, reward, Pgrid, Pprod_shed, Pcons_unsatisfied
 #################################################################################################################################
-# Set de l'indice de l'état:
-    def set_k(self, state) :
-        if state < 0 :
-            print("Index d'état négatif, impossible")
-            return -1
-        if state>= self.n_state :
-            print("Index d'état trop grand, impossible")
-            return -1
-        self.state = state
-        return 0
-#################################################################################################################################
-# Set  de l'état:       
-    def set_state(self, SOC, Pnet) :
-        if (SOC<self.SOC[0] or SOC>self.SOC[-1]) :
+#%% Set  de l'état:       
+    def set_state(self, SOC, Pnet, T) :
+        if (SOC<self.SoC[0] or SOC>self.SoC[-1]) :
             print ("Valeur de SOC hors limites")
             return -1
         if (Pnet<self.Pnet[0] or Pnet>self.Pnet[-1]) :
             print ("Valeur de Pnet hors limites")
             return -1
-        i, j = int(SOC)//self.dP, int(Pnet)//self.dP+(self.n_Pnet-1)//2
-        self.state = self.n_Pnet*i + j
-#        print("i=",i," - j=",j," - state=",self.state)
-        return self.state
 
+        i_time = int(round(T/self.DT))
+        i_soc  = int(round((SOC-self.SoC_min)/self.dp))
+        i_Pnet = int(round((Pnet-self.Pnet_min)/self.dp))
+        self.index_state = self.n_Pnet * (i_time*self.n_SoC + i_soc) + i_Pnet
+        return self.index_state         
+#        self.state = self.env[(self.env['temps'] == T ) & (self.env['state_SOC'] == SOC) & (self.env['state_Pnet'] == Pnet)]
+#        self.index_state = self.state.index.values[0]  
+#        return self.index_stat 
 ################################################################################################################################
-# Reset de l'agent à l'état initial:
+#%% Reset de l'agent à l'état initial:
     def reset(self):
-        self.state = self.state_ini  # Reset state to zero, the beginning of dungeon
-        return self.state
-    
+        self.index_state = self.index_ini
+        return self.index_state
+#        self.state = self.state_ini  # Reset state to zero, the beginning of dungeon
+#        self.index_state = self.state.index.values[0]  # Point de départ
+#        return self.index_state    
 ################################################################################################################################    
+#%% 
     def __str__(self) :
         message = 'Etat courant = ' + str(self.state) + '\n'
-        i = self.state // self.n_Pnet
-        message += 'SOC = ' + str(self.SOC[i]) + '\n'
-        j = self.state % self.n_Pnet
-        message += 'Pnet = ' + str(self.Pnet[j]) + '\n'
         return message
