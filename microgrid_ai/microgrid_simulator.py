@@ -10,7 +10,6 @@ Les contraints sont: 1- Eviter l'injecter énergie sur le réseau (Cinject_grid)
 """
 import numpy as np
 import pandas as pd
-# from actions import *
 
 GRID_OFF = 0
 GRID_ON = 1
@@ -19,7 +18,7 @@ GRID_ON = 1
 class MicrogridSimulator:
 
     def __init__(self, n_Time, Pnet_ini, SOC_ini, Temp_ini, Pnet, SoC, n_Pnet, n_SoC, dp, SoC_min, Pnet_min,
-                 Cbatful, C_PV_shed, Cbat_empty, Cgrid_use_Creuse, Cgrid_use_plaine, Cbat_use, dt=0.5):
+                 Cbatful, C_PV_shed, Cbat_empty, Cgrid_use_Creuse, Cgrid_use_plaine, Cbat_use, dt):
         """
         Simulation of the microgrids... 
 
@@ -54,7 +53,7 @@ class MicrogridSimulator:
         self.n_Pnet = n_Pnet
         self.n_SoC = n_SoC
         self.dp = dp
-        self.DT = dt
+        self.dt = dt
         self.Pnet_min = Pnet_min
         self.SoC_min = SoC_min
         self.SoC = SoC
@@ -64,7 +63,7 @@ class MicrogridSimulator:
         self.Temp_ini = Temp_ini
 
         self.n_Time = n_Time
-        self.Time = self.DT * np.arange(self.n_Time)
+        self.Time = self.dt * np.arange(self.n_Time)
 
         SoC2 = np.repeat(self.SoC, len(self.Pnet))
         self.state_SOC = pd.Series(SoC2)
@@ -91,7 +90,7 @@ class MicrogridSimulator:
         self.env = pd.concat([self.temp1, self.env1], axis=1)
         self.env = pd.concat([self.env, self.tarif], axis=1)
 
-        i_time = int(round(self.Temp_ini / self.DT))
+        i_time = int(round(self.Temp_ini / self.dt))
         i_soc = int(round((self.SOC_ini - self.SoC_min) / self.dp))
         i_Pnet = int(round((self.Pnet_ini - self.Pnet_min) / self.dp))
 
@@ -179,7 +178,7 @@ class MicrogridSimulator:
             print("Valeur de Pnet hors limites")
             return -1
 
-        i_time = int(round(T / self.DT))
+        i_time = int(round(T / self.dt))
         i_soc = int(round((SOC - self.SoC_min) / self.dp))
         i_Pnet = int(round((Pnet - self.Pnet_min) / self.dp))
         self.index_state = self.n_Pnet * (i_time * self.n_SoC + i_soc) + i_Pnet

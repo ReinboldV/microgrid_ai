@@ -31,9 +31,8 @@ class Agent:
     def get_next_action(self, state):
         """
         Choix du mode exploration ou exploitation :
-
-        :param state:
-        :return:
+        param state:
+        return:
         """
         if random.random() > self.exploration_rate:  # Explore (gamble) or exploit (greedy)
             return self.greedy_action(state)
@@ -42,10 +41,9 @@ class Agent:
 
     def greedy_action(self, state):
         """
-        Mode exploitation
-
-        :param state:
-        :return:
+        Mode exploitation:
+        param : state
+        return:
         """
         # TODO: Faire une recherche de MAX dans la q_table à l'état state.
         #  Pour etre généralisable à n'importe
