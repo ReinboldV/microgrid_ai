@@ -15,8 +15,10 @@ from microgrid_ai.microgrid_simulator import MicrogridSimulator
 plt.close('all')
 
 # %% Initialisation de nombre d'épisodes et la taille d'actions possible(Grid_On ou Grid_OFF):
-n_episode = 100
+n_episode = 10
 n_jour_visio = 4
+delta_episode_performence = 100
+index_performence = np.arange(0,n_episode,delta_episode_performence)
 
 dt = 0.5  # [h] Pas de discrétisation du temps
 dp = 100  # Pas de discrétisation de Puissance
@@ -57,7 +59,7 @@ for i in range(1, n_episode):
     X = pd.read_csv(os.path.join(data_path, str(sample_data_names.Dates[i])), delimiter="\t")
     X = X.drop(X.index[len(X) - 1])
     Training_data = pd.concat([Training_data, X], axis=0, join='inner', ignore_index=True)
-
+    
 Pnet1 = ((Training_data.Cons - Training_data.Prod) // dp) * dp
 
 # %%
@@ -100,11 +102,10 @@ agent = Agent(n_state, n_episode, learning_rate, discount, exploration_rate, ite
 # %% main loop:
 # Initialisation des paramètres ###
 reward_episode = np.zeros(n_episode)
+Pgrid_episode = np.zeros(n_episode)
 Pgrid_step = np.zeros(n_episode * n_points)
 Pprod_shed_step = np.zeros(n_episode * n_points)
 Pcons_unsatisfied_step = np.zeros(n_episode * n_points)
-last_total_reward = np.zeros(n_episode)
-last_total_reward[0] = 0
 Statofcharge = np.zeros(iterations)
 
 Statofcharge_last_day = np.zeros(n_jour_visio * n_points)
@@ -115,13 +116,19 @@ Pcons_unsatisfied_step_last_day = np.zeros(n_jour_visio * n_points)
 
 ### Coeur de l'algorithme ###
 for episode in range(n_episode):
+    
     total_reward = 0
     total_Pgrid = 0
+    
     for step in range(n_points):
+        
         old_state = microgrid.index_state
         
-        action = agent.get_next_action(old_state)  # Query agent for the next action
-        
+        if (episode % delta_episode_performence == 0):
+            action = agent.greedy_action(old_state)  # Query agent for the next action
+        else:
+            action = agent.get_next_action(old_state)  # Query agent for the next action 
+            
         new_state, reward, Pgrid, Pprod_shed, Pcons_unsatisfied = microgrid.take_action(action, Pnet1[
             (episode * n_points) + step])  # Take action, get new state and reward
 
@@ -135,7 +142,8 @@ for episode in range(n_episode):
         Pcons_unsatisfied_step[(episode * n_points) + step] = Pcons_unsatisfied
         
     reward_episode[episode] = total_reward
-
+    Pgrid_episode[episode] = total_Pgrid
+    
 Final_Q_table = agent.q_table
 
 # Calcule des différents variables au cours du temps:
@@ -168,8 +176,7 @@ for j in range(n_jour):
 
 Pgrid_out_creuse = (Creuse_part_1 + Creuse_part_2) / 1000  # Division par 1000 pour mettre les valeurs en kWh
 Pgrid_out_plaine = Plaine_part / 1000  # Division par 1000 pour mettre les valeurs en kWh
-Pcons_unsatisfied_out = np.cumsum(
-    Pcons_unsatisfied_step_last_day) / 1000  # Division par 1000 pour mettre les valeurs en kWh
+Pcons_unsatisfied_out = np.cumsum(Pcons_unsatisfied_step_last_day) / 1000  # Division par 1000 pour mettre les valeurs en kWh
 
 Cout_achat = Cout_grid_Creuse * Pgrid_out_creuse + Cout_grid_plaine * Cout_grid_plaine
 Cout_unsatisfied = - C_conso_unsatisfied * Pcons_unsatisfied_out[-1]
@@ -210,14 +217,6 @@ plt.ylabel('cumulative rewards per episode')
 plt.title('Reward_Par_episode')
 plt.show()
 plt.grid(True)
-
-# plt.figure(4)
-# plt.plot(performance,'bo-')
-# plt.xlabel('episods')
-# plt.ylabel('Actuel reward  - Last reward')
-# plt.title('Difference reward between two episodes')
-# plt.show()
-# plt.grid(True)
 
 # %% Enregistrer le Q_table
 #
