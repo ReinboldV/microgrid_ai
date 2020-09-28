@@ -219,8 +219,8 @@ plt.show()
 plt.grid(True)
 
 # %% Enregistrer le Q_table
-#
-# data_2write = pd.concat([Final_Q_table['GRID_OFF'],Final_Q_table['GRID_ON'] ],axis=1, join='inner', keys=['GRID_OFF','GRID_ON'] , sort=False)
-# file_write = 'Q_table' + '.txt'
-# sep_write = '\t'
-# pd.DataFrame.to_csv(data_2write,file_write,sep_write,index=True)
+data_2write = pd.concat([Final_Q_table['GRID_OFF'],Final_Q_table['GRID_ON'] ],axis=1, join='inner', keys=['GRID_OFF','GRID_ON'] , sort=False)
+file_write = 'Q_table' + '.txt'
+sep_write = '\t'
+path_write = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
+data_2write.to_csv(os.path.join(path_write,file_write),sep=sep_write,index=True)

@@ -22,10 +22,10 @@ from microgrid_ai.microgrid_simulator import MicrogridSimulator
 plt.close('all')
 
 # %% Initialisation de nombre d'épisodes et la taille d'actions possible(Grid_On ou Grid_OFF):
-n_episode = 10000
+n_episode = 100
 n_jour_visio = 4
 
-delta_episode_performence = 10
+delta_episode_performence = 500
 index_performence = np.arange(0,n_episode,delta_episode_performence)
 
 dt = 0.5  # [h] Pas de discrétisation du temps
@@ -121,7 +121,7 @@ Pgrid_step = np.zeros(n_episode * n_points)
 Pprod_shed_step = np.zeros(n_episode * n_points)
 Pcons_unsatisfied_step = np.zeros(n_episode * n_points)
 Statofcharge = np.zeros(iterations)
-performence_reward = np.zeros(len(index_performence))
+performence_reward =[]
 Statofcharge_last_day = np.zeros(n_jour_visio * n_points)
 Pnet1_last_day = np.zeros(n_jour_visio * n_points)
 Pgrid_last_day = np.zeros(n_jour_visio * n_points)
@@ -134,34 +134,53 @@ for episode in range(n_episode):
     total_reward = 0
     total_Pgrid = 0
     
-    for step in range(n_points):
+    if (episode % delta_episode_performence == 0):
         
-        old_state = microgrid.index_state
+        for step in range(n_points):
         
-        if (episode % delta_episode_performence == 0):
-            action = agent.greedy_action(old_state)  # Query agent for the next action
-        else:
-            action = agent.get_next_action(old_state)  # Query agent for the next action 
-            
-        new_state, reward, Pgrid, Pprod_shed, Pcons_unsatisfied = microgrid.take_action(action, Pnet1[
+            old_state = microgrid.index_state
+            action = agent.greedy_action(old_state)
+            new_state, reward, Pgrid, Pprod_shed, Pcons_unsatisfied = microgrid.take_action(action, Pnet1[
             (episode * n_points) + step])  # Take action, get new state and reward
 
-        agent.update(old_state, new_state, action, reward)  # Let the agent update internals
+            agent.update(old_state, new_state, action, reward)  # Let the agent update internals
 
-        total_reward += reward
-        total_Pgrid += Pgrid
-        Statofcharge[(episode * n_points) + step] = microgrid.state_SOC[new_state]
-        Pgrid_step[(episode * n_points) + step] = Pgrid
-        Pprod_shed_step[(episode * n_points) + step] = Pprod_shed
-        Pcons_unsatisfied_step[(episode * n_points) + step] = Pcons_unsatisfied
+            total_reward += reward
+            total_Pgrid += Pgrid
+            Statofcharge[(episode * n_points) + step] = microgrid.state_SOC[new_state]
+            Pgrid_step[(episode * n_points) + step] = Pgrid
+            Pprod_shed_step[(episode * n_points) + step] = Pprod_shed
+            Pcons_unsatisfied_step[(episode * n_points) + step] = Pcons_unsatisfied
         
-    reward_episode[episode] = total_reward
-    Pgrid_episode[episode] = total_Pgrid
-    
-    
-for i in range(len(index_performence)-1):
-    performence_reward[i] = np.abs((reward_episode[(i+1)*delta_episode_performence]-reward_episode[i*delta_episode_performence])/delta_episode_performence)
+        reward_episode[episode] = total_reward
+        Pgrid_episode[episode] = total_Pgrid
+        performence_reward.append(np.abs(reward_episode[episode]))
 
+    
+    else:
+        
+        for step in range(n_points):
+        
+            old_state = microgrid.index_state
+            
+    
+            action = agent.get_next_action(old_state)  # Query agent for the next action 
+                
+            new_state, reward, Pgrid, Pprod_shed, Pcons_unsatisfied = microgrid.take_action(action, Pnet1[
+                (episode * n_points) + step])  # Take action, get new state and reward
+    
+            agent.update(old_state, new_state, action, reward)  # Let the agent update internals
+    
+            total_reward += reward
+            total_Pgrid += Pgrid
+            Statofcharge[(episode * n_points) + step] = microgrid.state_SOC[new_state]
+            Pgrid_step[(episode * n_points) + step] = Pgrid
+            Pprod_shed_step[(episode * n_points) + step] = Pprod_shed
+            Pcons_unsatisfied_step[(episode * n_points) + step] = Pcons_unsatisfied
+            
+        reward_episode[episode] = total_reward
+        Pgrid_episode[episode] = total_Pgrid
+        
 Final_Q_table = agent.q_table
 
 # Calcule des différents variables au cours du temps:
@@ -204,7 +223,7 @@ print( ' Cout Achat de grid = {} \n Cout demande unsatisfied = {} \n Cout_Total 
 ############################################################################################################
 # %%
 t_calcul = time.time() - t0
-print(' Nombres pisodes = {} \n Temps de calcul = {}'.format(n_episode, t_calcul), 'seconds')
+print(' Nombres pisodes = {} \n dp = {} \n Temps de calcul = {}'.format(n_episode,dp, t_calcul), 'seconds')
 ######################################################################################################
 # %% Affichage
 plt.figure(1)
@@ -237,7 +256,8 @@ plt.show()
 plt.grid(True)
 
 plt.figure(3)
-plt.plot(performence_reward,'bo-')
+#plt.semilogy(performence_reward,'bo-')
+plt.loglog(performence_reward,'bo-')
 plt.xlabel('episods')
 plt.ylabel('Reward par episode')
 plt.title('Performence sur reward')
@@ -253,8 +273,8 @@ plt.grid(True)
 #plt.grid(True)
 
 # %% Enregistrer le Q_table
-#
-# data_2write = pd.concat([Final_Q_table['GRID_OFF'],Final_Q_table['GRID_ON'] ],axis=1, join='inner', keys=['GRID_OFF','GRID_ON'] , sort=False)
-# file_write = 'Q_table' + '.txt'
-# sep_write = '\t'
-# pd.DataFrame.to_csv(data_2write,file_write,sep_write,index=True)
+data_2write = pd.concat([Final_Q_table['GRID_OFF'],Final_Q_table['GRID_ON'] ],axis=1, join='inner', keys=['GRID_OFF','GRID_ON'] , sort=False)
+file_write = 'Q_table' + '.txt'
+sep_write = '\t'
+path_write = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
+data_2write.to_csv(os.path.join(path_write,file_write),sep=sep_write,index=True)
