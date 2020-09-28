@@ -19,7 +19,7 @@ start_day_month_test = 5
 n_jour_test = 7
 
 dt = 0.5  # [h] Pas de discrétisation du temps
-dp = 100  # Pas de discrétisation de Puissance
+dp = 1370  #il faut le choisir en fonction de test  # Pas de discrétisation de Puissance
 SoC_min, SoC_max = 0, 21000  # [W.h] Capacité min et max de la batterie   
 
 # le tarif bleu du réseau :
@@ -33,9 +33,10 @@ On prend une sample avec (le nombre de jour = n_episode) de notre data_base
 Chaque épisode présente un jour choisi par hazard dans notre database
 
 """
-data_path = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
+data_path = r"C:\Users\DINI\Documents\GitHub\microgrid_ai\data\drahix"
 
 month = pd.Series(pd.date_range('8/1/2018', freq='D', periods=31))
+#month = pd.Series(pd.date_range('8/1/2019', freq='D', periods=31))
 
 data_base = pd.DataFrame({'Dates': month})
 data_base['Dates'] = data_base['Dates'].astype(str)
@@ -48,7 +49,8 @@ sample_data_names = data_base.iloc[chosen_idx]
 sample_data_names = 'DrahiX_5min_to_30Min@' + sample_data_names + '.txt'
 sample_data_names = sample_data_names.set_index((np.arange(n_jour_test)))
 
-Testing_data = pd.read_csv(os.path.join(data_path, str(sample_data_names.Dates[0])), delimiter="\t")
+Testing_data = pd.read_csv(os.path.join(data_path, str(sample_data_names.Dates[0])), delimiter="\t") 
+
 Testing_data = Testing_data.drop(Testing_data.index[len(Testing_data) - 1])
 
 for i in range(1, n_jour_test):
@@ -59,7 +61,7 @@ for i in range(1, n_jour_test):
 Pnet1 = ((Testing_data.Cons - Testing_data.Prod) // dp) * dp
 
 #%% Récuperer la Q_Table obtenue par les données historiques
-file = 'Q_table_winter_SOC_ini_fixe'
+file = 'Q_table'
 file_read = file + '.txt'
 q_table = pd.read_csv(os.path.join(data_path, file_read), delimiter="\t")
 ####################################################################################################################  

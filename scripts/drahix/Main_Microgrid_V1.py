@@ -15,9 +15,9 @@ from microgrid_ai.microgrid_simulator import MicrogridSimulator
 plt.close('all')
 
 # %% Initialisation de nombre d'épisodes et la taille d'actions possible(Grid_On ou Grid_OFF):
-n_episode = 10
+n_episode = 100
 n_jour_visio = 4
-delta_episode_performence = 100
+delta_episode_performence = 10
 index_performence = np.arange(0,n_episode,delta_episode_performence)
 
 dt = 0.5  # [h] Pas de discrétisation du temps
@@ -35,7 +35,7 @@ On prend une sample avec (le nombre de jour = n_episode) de notre data_base
 Chaque épisode présente un jour choisi par hazard dans notre database
 
 """
-data_path = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
+data_path = r"C:\Users\DINI\Documents\GitHub\microgrid_ai\data\drahix"
 
 month1 = pd.Series(pd.date_range('8/1/2016', freq='D', periods=31))
 month2 = pd.Series(pd.date_range('8/1/2017', freq='D', periods=31))
@@ -186,7 +186,7 @@ print( ' Cout Achat de grid = {} \n Cout demande unsatisfied = {} \n Cout_Total 
 ############################################################################################################
 # %%
 t_calcul = time.time() - t0
-print(' Nombres pisodes = {} \n Temps de calcul = {}'.format(n_episode, t_calcul), 'seconds')
+print(' Nombres episodes = {} \n dp --> for test = {} \n Temps de calcul = {}'.format(n_episode, dp, t_calcul), 'seconds')
 ######################################################################################################
 # %% Affichage
 plt.figure(1)
@@ -219,8 +219,8 @@ plt.show()
 plt.grid(True)
 
 # %% Enregistrer le Q_table
-data_2write = pd.concat([Final_Q_table['GRID_OFF'],Final_Q_table['GRID_ON'] ],axis=1, join='inner', keys=['GRID_OFF','GRID_ON'] , sort=False)
+data_2write = pd.concat([Final_Q_table['GRID_OFF'],Final_Q_table['GRID_ON']], axis=1, join='inner', keys=['GRID_OFF','GRID_ON'] , sort=False)
 file_write = 'Q_table' + '.txt'
 sep_write = '\t'
-path_write = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
+path_write = r"C:\Users\DINI\Documents\GitHub\microgrid_ai\data\drahix"
 data_2write.to_csv(os.path.join(path_write,file_write),sep=sep_write,index=True)
