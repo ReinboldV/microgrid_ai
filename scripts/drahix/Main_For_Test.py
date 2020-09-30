@@ -15,11 +15,11 @@ from microgrid_ai.microgrid_simulator_test import MicrogridSimulator
 plt.close('all')
 
 # %%
-start_day_month_test = 5
+start_day_month_test = 1
 n_jour_test = 7
 
 dt = 0.5  # [h] Pas de discrétisation du temps
-dp = 100  # Pas de discrétisation de Puissance
+dp = 1400  # Pas de discrétisation de Puissance
 SoC_min, SoC_max = 0, 21000  # [W.h] Capacité min et max de la batterie   
 
 # le tarif bleu du réseau :
@@ -59,7 +59,7 @@ for i in range(1, n_jour_test):
 Pnet1 = ((Testing_data.Cons - Testing_data.Prod) // dp) * dp
 
 #%% Récuperer la Q_Table obtenue par les données historiques
-file = 'Q_table_winter_SOC_ini_fixe'
+file = 'Q_table_2mois_centmills'
 file_read = file + '.txt'
 q_table = pd.read_csv(os.path.join(data_path, file_read), delimiter="\t")
 ####################################################################################################################  
@@ -87,7 +87,7 @@ Pnet = np.linspace(Pnet_min,Pnet_max,n_Pnet)
 #%% Construire de l'environement et l'agent:
 microgrid = MicrogridSimulator(n_Time, Pnet_ini, SOC_ini, Temp_ini, Pnet, SoC,n_Pnet,n_SOC, dp, SoC_min, Pnet_min, dt)
 
-agent=Agent(q_table)
+agent = Agent(q_table)
 ################################################################################################################  
 #%% main loop:    
 
@@ -108,9 +108,9 @@ for step in range(n_points):
     action = agent.get_next_action(old_state)                     # Query agent for the next action
 
     new_state, Pgrid, Pprod_shed, Pcons_unsatisfied = microgrid.take_action(action,Pnet1[step]) # Take action, get new state and reward
-    
+
     Statofcharge[step] = microgrid.state_SOC[new_state] 
-    
+#    Statofcharge[step]  = microgrid.env.loc[new_state,'state_SOC']
     Pgrid_step[step] = Pgrid
     
     Pprod_shed_step[step] = Pprod_shed

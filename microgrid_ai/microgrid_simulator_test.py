@@ -32,8 +32,8 @@ class MicrogridSimulator:
         self.Temp_ini = Temp_ini
         self.actions = {0: 'GRID_OFF', 1: 'GRID_ON'}
         self.n_Time = n_Time
-        self.Time = self.dt * np.arange(self.n_Time)
-        
+#        self.Time = self.dt * np.arange(self.n_Time)
+        self.Time = np.arange(self.n_Time)
         SoC2 = np.repeat(self.SoC, len(self.Pnet))
         self.state_SOC = pd.Series(SoC2)
 
@@ -87,11 +87,19 @@ class MicrogridSimulator:
             elif action == 'fiftyfifty':
                 pass
                 
-        T = (T+1)//self.n_Time
+#        T = (T+1)//self.n_Time
+#        
+#        index_state_1 = self.set_state ( SOC1 , Pnet1, T )
+#        
+#        return index_state_1, Pgrid, Pprod_shed, Pcons_unsatisfied
+                
+        T = (T+1) % self.n_Time
         
-        index_state_1 = self.set_state ( SOC1 , Pnet1, T )
+        index_state = self.set_state ( SOC1 , Pnet1, T )
         
-        return index_state_1, Pgrid, Pprod_shed, Pcons_unsatisfied
+        self.index_state = index_state
+        
+        return index_state, Pgrid, Pprod_shed, Pcons_unsatisfied
 #################################################################################################################################
 #%% Set  de l'état:       
     def set_state(self, SOC, Pnet, T) :
@@ -102,7 +110,8 @@ class MicrogridSimulator:
             print ("Valeur de Pnet hors limites")
             return -1
 
-        i_time = int(round(T/self.dt))
+#        i_time = int(round(T/self.dt))
+        i_time = int(T)
         i_soc  = int(round((SOC-self.SoC_min)/self.dp))
         i_Pnet = int(round((Pnet-self.Pnet_min)/self.dp))
         self.index_state = self.n_Pnet * (i_time*self.n_SoC + i_soc) + i_Pnet

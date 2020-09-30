@@ -4,14 +4,6 @@ Created on Fri Sep 25 11:55:12 2020
 
 @author: mdini
 """
-
-# -*- coding: utf-8 -*-
-
-"""
-Created on Fri May 15 10:30:13 2020
-
-@author: mdini
-"""
 import time
 import os
 import matplotlib.pyplot as plt
@@ -22,14 +14,14 @@ from microgrid_ai.microgrid_simulator import MicrogridSimulator
 plt.close('all')
 
 # %% Initialisation de nombre d'épisodes et la taille d'actions possible(Grid_On ou Grid_OFF):
-n_episode = 100
-n_jour_visio = 4
+n_episode = 100000
+n_jour_visio = 7
 
 delta_episode_performence = 500
 index_performence = np.arange(0,n_episode,delta_episode_performence)
 
 dt = 0.5  # [h] Pas de discrétisation du temps
-percent_pas = 0.01 # Pourcentage por le pas de discrétisation de Puissance
+percent_pas = 0.05 # Pourcentage por le pas de discrétisation de Puissance
 SoC_min, SoC_max = 0, 21000  # [W.h] Capacité min et max de la batterie   
 
 # le tarif bleu du réseau :
@@ -72,7 +64,7 @@ Pnet1_brut = (Training_data.Cons - Training_data.Prod)
 
 Pnet_min_brut, Pnet_max_brut = min(Pnet1_brut), max(Pnet1_brut)  # [W]
 
-dp = np.round(percent_pas* (Pnet_max_brut - Pnet_min_brut))   # Pas de discrétisation de Puissance
+dp = np.round(percent_pas* (Pnet_max_brut - Pnet_min_brut))//10*10   # Pas de discrétisation de Puissance
 
 Pnet1 = ((Training_data.Cons - Training_data.Prod) // dp) * dp
 
@@ -115,17 +107,17 @@ agent = Agent(n_state, n_episode, learning_rate, discount, exploration_rate, ite
 
 # %% main loop:
 # Initialisation des paramètres ###
-reward_episode = np.zeros(n_episode)
-Pgrid_episode = np.zeros(n_episode)
-Pgrid_step = np.zeros(n_episode * n_points)
-Pprod_shed_step = np.zeros(n_episode * n_points)
-Pcons_unsatisfied_step = np.zeros(n_episode * n_points)
-Statofcharge = np.zeros(iterations)
-performence_reward =[]
-Statofcharge_last_day = np.zeros(n_jour_visio * n_points)
-Pnet1_last_day = np.zeros(n_jour_visio * n_points)
-Pgrid_last_day = np.zeros(n_jour_visio * n_points)
-Pprod_shed_step_last_day = np.zeros(n_jour_visio * n_points)
+reward_episode                  = np.zeros(n_episode)
+Pgrid_episode                   = np.zeros(n_episode)
+Pgrid_step                      = np.zeros(n_episode * n_points)
+Pprod_shed_step                 = np.zeros(n_episode * n_points)
+Pcons_unsatisfied_step          = np.zeros(n_episode * n_points)
+Statofcharge                    = np.zeros(iterations)
+performence_reward              =[]
+Statofcharge_last_day           = np.zeros(n_jour_visio * n_points)
+Pnet1_last_day                  = np.zeros(n_jour_visio * n_points)
+Pgrid_last_day                  = np.zeros(n_jour_visio * n_points)
+Pprod_shed_step_last_day        = np.zeros(n_jour_visio * n_points)
 Pcons_unsatisfied_step_last_day = np.zeros(n_jour_visio * n_points)
 
 ### Coeur de l'algorithme ###
@@ -147,14 +139,14 @@ for episode in range(n_episode):
 
             total_reward += reward
             total_Pgrid += Pgrid
-            Statofcharge[(episode * n_points) + step] = microgrid.state_SOC[new_state]
+            Statofcharge[(episode * n_points) + step] = microgrid.env.loc[new_state,'state_SOC']
             Pgrid_step[(episode * n_points) + step] = Pgrid
             Pprod_shed_step[(episode * n_points) + step] = Pprod_shed
             Pcons_unsatisfied_step[(episode * n_points) + step] = Pcons_unsatisfied
         
-        reward_episode[episode] = total_reward
+        reward_episode[episode] = np.abs(total_reward)
         Pgrid_episode[episode] = total_Pgrid
-        performence_reward.append(np.abs(reward_episode[episode]))
+        performence_reward.append(reward_episode[episode])
 
     
     else:
@@ -173,12 +165,12 @@ for episode in range(n_episode):
     
             total_reward += reward
             total_Pgrid += Pgrid
-            Statofcharge[(episode * n_points) + step] = microgrid.state_SOC[new_state]
+            Statofcharge[(episode * n_points) + step] = microgrid.env.loc[new_state,'state_SOC']
             Pgrid_step[(episode * n_points) + step] = Pgrid
             Pprod_shed_step[(episode * n_points) + step] = Pprod_shed
             Pcons_unsatisfied_step[(episode * n_points) + step] = Pcons_unsatisfied
             
-        reward_episode[episode] = total_reward
+        reward_episode[episode] = np.abs(total_reward)
         Pgrid_episode[episode] = total_Pgrid
         
 Final_Q_table = agent.q_table
@@ -229,7 +221,7 @@ print(' Nombres pisodes = {} \n dp = {} \n Temps de calcul = {}'.format(n_episod
 plt.figure(1)
 plt.subplot(211)
 plt.plot(Statofcharge_last_day)
-plt.xlabel('Houre')
+plt.xlabel('Steps:(Houre)')
 plt.ylabel('Energie')
 plt.title('Bilan de Gestion Energie Par RL pour "' + str(n_jour_visio) + '" derniers jours')
 plt.legend((' SoC % '), loc='best', shadow=True)
@@ -242,7 +234,7 @@ plt.plot(Pprod_shed_step_last_day)
 plt.plot(Pcons_unsatisfied_step_last_day)
 plt.legend(('Pnet_last_day', 'Pgrid_last_day ', 'Pprod_shed_step_last_day', 'Pcons_unsatisfied_step_last_day'),
 loc='best', shadow=True)
-plt.xlabel('Houre')
+plt.xlabel('Steps:(Houre)')
 plt.ylabel('Puissance')
 plt.grid(True)
 plt.show()
@@ -251,15 +243,15 @@ plt.figure(2)
 plt.plot(reward_episode,'yo-')
 plt.xlabel('episods')
 plt.ylabel('cumulative rewards per episode')
-plt.title('Reward_Par_episode')
+plt.title('Pénalité Par episode')
 plt.show()
 plt.grid(True)
 
 plt.figure(3)
-#plt.semilogy(performence_reward,'bo-')
-plt.loglog(performence_reward,'bo-')
+plt.semilogy(performence_reward,'bo-')
+#plt.loglog(performence_reward,'bo-')
 plt.xlabel('episods')
-plt.ylabel('Reward par episode')
+plt.ylabel('Pénalité par episode')
 plt.title('Performence sur reward')
 plt.show()
 plt.grid(True)
