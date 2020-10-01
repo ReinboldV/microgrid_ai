@@ -33,7 +33,6 @@ class MicrogridSimulator:
         self.Temp_ini = Temp_ini
         self.actions = {0: 'GRID_OFF', 1: 'GRID_ON'}
         self.n_Time = n_Time
-#        self.Time = (np.arange(self.n_Time))*self.dt
         self.Time = np.arange(self.n_Time)
         
         SoC2 = np.repeat(self.SoC, len(self.Pnet))

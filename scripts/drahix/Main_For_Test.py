@@ -144,8 +144,9 @@ Ctotal = Cout_achat + Cout_unsatisfied
 print(' Cout Achat de grid = {} \n Cout demande unsatisfied = {} \n Cout_Total = {}'.format(Cout_achat, Cout_unsatisfied, Ctotal) ,'Euros')
 ############################################################################################################
 # %% Affichage
-freq_affich ='6H'
-step_xtick= 12 # Il faut mettre une valeure deux fois plus que freq_affich
+freq_heur_affich = 6
+step_xtick= 2*freq_heur_affich # Il faut mettre une valeure deux fois plus que freq_affich
+freq_affich = str(freq_heur_affich)+'H'
 rng = pd.Series(pd.date_range(first_day_database, freq=freq_affich, periods = n_jour_test*4))
 rng=pd.DataFrame({'rng': rng})
 rng=rng['rng'].astype(str)
