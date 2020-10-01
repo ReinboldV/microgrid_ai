@@ -10,13 +10,14 @@ Les contraints sont: 1- Eviter l'injecter énergie sur le réseau (Cinject_grid)
 """
 import numpy as np
 import pandas as pd
+
 GRID_OFF = 0
 GRID_ON = 1
 
 #%% 
 class MicrogridSimulator:
 
-    def __init__(self,n_Time, Pnet_ini, SOC_ini, Temp_ini, Pnet, SoC,n_Pnet,n_SoC, dp, SoC_min, Pnet_min, dt):
+    def __init__(self, n_Time, Pnet_ini, SOC_ini, Temp_ini, Pnet, SoC,n_Pnet,n_SoC, dp, SoC_min, Pnet_min, dt):
         
 
         self.n_Pnet = n_Pnet
@@ -32,11 +33,14 @@ class MicrogridSimulator:
         self.Temp_ini = Temp_ini
         self.actions = {0: 'GRID_OFF', 1: 'GRID_ON'}
         self.n_Time = n_Time
-#        self.Time = self.dt * np.arange(self.n_Time)
+#        self.Time = (np.arange(self.n_Time))*self.dt
         self.Time = np.arange(self.n_Time)
+        
         SoC2 = np.repeat(self.SoC, len(self.Pnet))
         self.state_SOC = pd.Series(SoC2)
-
+        self.state_SOC = pd.DataFrame({'state_SOC': self.state_SOC})
+        self.state_SOC = [self.state_SOC] * (self.n_Time)
+        self.state_SOC = pd.concat(self.state_SOC, ignore_index=True)
 
         i_time = int(round(self.Temp_ini / self.dt))
         i_soc  = int(round((self.SOC_ini - self.SoC_min) / self.dp))
@@ -87,14 +91,9 @@ class MicrogridSimulator:
             elif action == 'fiftyfifty':
                 pass
                 
-#        T = (T+1)//self.n_Time
-#        
-#        index_state_1 = self.set_state ( SOC1 , Pnet1, T )
-#        
-#        return index_state_1, Pgrid, Pprod_shed, Pcons_unsatisfied
                 
         T = (T+1) % self.n_Time
-        
+
         index_state = self.set_state ( SOC1 , Pnet1, T )
         
         self.index_state = index_state
@@ -110,7 +109,6 @@ class MicrogridSimulator:
             print ("Valeur de Pnet hors limites")
             return -1
 
-#        i_time = int(round(T/self.dt))
         i_time = int(T)
         i_soc  = int(round((SOC-self.SoC_min)/self.dp))
         i_Pnet = int(round((Pnet-self.Pnet_min)/self.dp))

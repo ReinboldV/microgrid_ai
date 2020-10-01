@@ -20,6 +20,7 @@ n_jour_test = 7
 
 dt = 0.5  # [h] Pas de discrétisation du temps
 dp = 1400  # Pas de discrétisation de Puissance
+Pnet_min, Pnet_max = -15400, 12600   # [W]
 SoC_min, SoC_max = 0, 21000  # [W.h] Capacité min et max de la batterie   
 
 # le tarif bleu du réseau :
@@ -33,9 +34,9 @@ On prend une sample avec (le nombre de jour = n_episode) de notre data_base
 Chaque épisode présente un jour choisi par hazard dans notre database
 
 """
-data_path = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
-
-month = pd.Series(pd.date_range('8/1/2018', freq='D', periods=31))
+data_path = r"C:\Users\mdini\Desktop\Test"
+first_day_database = '8/1/2018'
+month = pd.Series(pd.date_range(first_day_database, freq='D', periods=31))
 
 data_base = pd.DataFrame({'Dates': month})
 data_base['Dates'] = data_base['Dates'].astype(str)
@@ -69,7 +70,7 @@ t0 = time.time()
 n_points = len(Pnet1)
 Temp_ini = 0
 Pnet_ini = Pnet1[0]
-Pnet_min, Pnet_max = min(Pnet1),max(Pnet1)  # [W]
+#Pnet_min, Pnet_max = min(Pnet1),max(Pnet1)  # [W]
 n_Time = int(round(24./dt))
 n_Pnet = int((Pnet_max - Pnet_min)/dp+1)
 n_SOC = int((SoC_max/dp)+1)
@@ -83,12 +84,13 @@ SOC_ini = 10500                                  # Choisir l'état initiale manu
 
 # Pnet array
 Pnet = np.linspace(Pnet_min,Pnet_max,n_Pnet)
-###############################################################################################################
+
+
 #%% Construire de l'environement et l'agent:
 microgrid = MicrogridSimulator(n_Time, Pnet_ini, SOC_ini, Temp_ini, Pnet, SoC,n_Pnet,n_SOC, dp, SoC_min, Pnet_min, dt)
 
 agent = Agent(q_table)
-################################################################################################################  
+
 #%% main loop:    
 
 ### Initialisation des paramètres ###
@@ -99,23 +101,22 @@ Pcons_unsatisfied_step=np.zeros(n_points)
 Statofcharge=np.zeros(n_points)
 
 ### Coeur de l'algorithme ###
-
-                                 
+                      
 for step in range(n_points):
     
     old_state = microgrid.index_state
-
+    
     action = agent.get_next_action(old_state)                     # Query agent for the next action
 
     new_state, Pgrid, Pprod_shed, Pcons_unsatisfied = microgrid.take_action(action,Pnet1[step]) # Take action, get new state and reward
-
-    Statofcharge[step] = microgrid.state_SOC[new_state] 
-#    Statofcharge[step]  = microgrid.env.loc[new_state,'state_SOC']
-    Pgrid_step[step] = Pgrid
     
-    Pprod_shed_step[step] = Pprod_shed
+    Statofcharge[step] = microgrid.state_SOC.loc[new_state,'state_SOC']
     
-    Pcons_unsatisfied_step[step] = Pcons_unsatisfied
+    Pgrid_step[step-1] = Pgrid
+    
+    Pprod_shed_step[step-1] = Pprod_shed
+    
+    Pcons_unsatisfied_step[step-1] = Pcons_unsatisfied
 #################################################################################################        
 # %% Calcule de Coût :
 """
@@ -143,13 +144,20 @@ Ctotal = Cout_achat + Cout_unsatisfied
 print(' Cout Achat de grid = {} \n Cout demande unsatisfied = {} \n Cout_Total = {}'.format(Cout_achat, Cout_unsatisfied, Ctotal) ,'Euros')
 ############################################################################################################
 # %% Affichage
+freq_affich ='6H'
+step_xtick= 12 # Il faut mettre une valeure deux fois plus que freq_affich
+rng = pd.Series(pd.date_range(first_day_database, freq=freq_affich, periods = n_jour_test*4))
+rng=pd.DataFrame({'rng': rng})
+rng=rng['rng'].astype(str)
+out = [x[11:-3] for x in rng]
 
 plt.figure(1)
 plt.subplot(211)
 plt.plot(Statofcharge)
-plt.xlabel('Houre')
+plt.xlabel('Heure')
 plt.ylabel('Energie')
-plt.title('Bilan de Gestion Energie Par RL par Q_table obtenue' )
+plt.xticks(ticks = np.arange(0,len(Statofcharge),step_xtick), labels = out)
+plt.title('Bilan de Gestion Energie Par RL en appliquant Q_table obtenue sur " '+str(n_jour_test)+' " jours')
 plt.legend((' SoC % '), loc='best', shadow=True)
 plt.grid(True)
 plt.show()
@@ -158,10 +166,10 @@ plt.plot(Pnet1)
 plt.plot(Pgrid_step)
 plt.plot(Pprod_shed_step)
 plt.plot(Pcons_unsatisfied_step)
-plt.legend(('Pnet_last_day', 'Pgrid_last_day ', 'Pprod_shed_step_last_day', 'Pcons_unsatisfied_step_last_day'),
-loc='best', shadow=True)
-plt.xlabel('Houre')
+plt.legend(('Pnet', 'Pgrid', 'Pprod_shed', 'Pcons_unsatisfied'), loc='best', shadow=True)
+plt.xlabel('Heure')
 plt.ylabel('Puissance')
+plt.xticks(ticks = np.arange(0,len(Statofcharge),12), labels = out)
 plt.grid(True)
 plt.show()
 

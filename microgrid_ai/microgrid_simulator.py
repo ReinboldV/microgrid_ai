@@ -63,7 +63,6 @@ class MicrogridSimulator:
         self.Temp_ini = Temp_ini
 
         self.n_Time = n_Time
-#        self.Time = self.dt * np.arange(self.n_Time)
         self.Time = np.arange(self.n_Time)
         SoC2 = np.repeat(self.SoC, len(self.Pnet))
         self.state_SOC = pd.Series(SoC2)
@@ -180,7 +179,6 @@ class MicrogridSimulator:
             print("Valeur de Pnet hors limites")
             return -1
 
-#        i_time = int(round(T / self.dt))
         i_time = int(T)
         i_soc = int(round((SOC - self.SoC_min) / self.dp))
         i_Pnet = int(round((Pnet - self.Pnet_min) / self.dp))

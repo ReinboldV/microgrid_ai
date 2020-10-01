@@ -12,13 +12,17 @@ import pandas as pd
 from microgrid_ai.agent_microgrid import Agent
 from microgrid_ai.microgrid_simulator import MicrogridSimulator
 plt.close('all')
+#%%
+def split_list(alist, wanted_parts):
+    length = len(alist)
+    return [ alist[i*length // wanted_parts: (i+1)*length // wanted_parts] 
+             for i in range(wanted_parts) ]
 
 # %% Initialisation de nombre d'épisodes et la taille d'actions possible(Grid_On ou Grid_OFF):
-n_episode = 100000
+n_episode = 1000
 n_jour_visio = 7
-
-delta_episode_performence = 500
-index_performence = np.arange(0,n_episode,delta_episode_performence)
+delta_episode_performence = 100
+nombr_jour_boxplot = 10
 
 dt = 0.5  # [h] Pas de discrétisation du temps
 percent_pas = 0.05 # Pourcentage por le pas de discrétisation de Puissance
@@ -37,8 +41,10 @@ Chaque épisode présente un jour choisi par hazard dans notre database
 """
 data_path = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
 
-month1 = pd.Series(pd.date_range('8/1/2016', freq='D', periods=31))
-month2 = pd.Series(pd.date_range('8/1/2017', freq='D', periods=31))
+first_day_database_1 = '8/1/2016'
+first_day_database_2 = '8/1/2017'
+month1 = pd.Series(pd.date_range(first_day_database_1, freq='D', periods=31))
+month2 = pd.Series(pd.date_range(first_day_database_1, freq='D', periods=31))
 database = pd.concat([month1, month2], axis=0, join='inner', ignore_index=True)
 
 data_base = pd.DataFrame({'Dates': database})
@@ -126,7 +132,7 @@ for episode in range(n_episode):
     total_reward = 0
     total_Pgrid = 0
     
-    if (episode % delta_episode_performence == 0):
+    if (episode % delta_episode_performence < nombr_jour_boxplot):
         
         for step in range(n_points):
         
@@ -154,10 +160,7 @@ for episode in range(n_episode):
         for step in range(n_points):
         
             old_state = microgrid.index_state
-            
-    
             action = agent.get_next_action(old_state)  # Query agent for the next action 
-                
             new_state, reward, Pgrid, Pprod_shed, Pcons_unsatisfied = microgrid.take_action(action, Pnet1[
                 (episode * n_points) + step])  # Take action, get new state and reward
     
@@ -215,14 +218,30 @@ print( ' Cout Achat de grid = {} \n Cout demande unsatisfied = {} \n Cout_Total 
 ############################################################################################################
 # %%
 t_calcul = time.time() - t0
-print(' Nombres pisodes = {} \n dp = {} \n Temps de calcul = {}'.format(n_episode,dp, t_calcul), 'seconds')
+print(' Nombres pisodes = {} \n dp = {} \n Pnet_min = {} \n Pnet_max = {} \n Temps de calcul = {}'.format(n_episode,dp, Pnet_min, Pnet_max, t_calcul), 'seconds')
 ######################################################################################################
+# %% Postprocessing:
+
+freq_heur_affich = 6
+step_xtick= 2*freq_heur_affich # Il faut mettre une valeure deux fois plus que freq_affich
+freq_affich = str(freq_heur_affich)+'H'
+rng = pd.Series(pd.date_range(first_day_database_1, freq=freq_affich, periods = n_jour_visio*4))
+rng=pd.DataFrame({'rng': rng})
+rng=rng['rng'].astype(str)
+out = [x[11:-3] for x in rng]
+
+performence_reward_slice = split_list(performence_reward, wanted_parts=int(n_episode/delta_episode_performence))
+performence_reward_slice = np.transpose(performence_reward_slice)
+performence_reward_slice= pd.DataFrame(performence_reward_slice, columns=np.arange(n_episode/delta_episode_performence))   
+
 # %% Affichage
+
 plt.figure(1)
 plt.subplot(211)
 plt.plot(Statofcharge_last_day)
-plt.xlabel('Steps:(Houre)')
+plt.xlabel('Heure')
 plt.ylabel('Energie')
+plt.xticks(ticks = np.arange(0,len(Statofcharge_last_day),step_xtick), labels = out)
 plt.title('Bilan de Gestion Energie Par RL pour "' + str(n_jour_visio) + '" derniers jours')
 plt.legend((' SoC % '), loc='best', shadow=True)
 plt.grid(True)
@@ -232,41 +251,42 @@ plt.plot(Pnet1_last_day)
 plt.plot(Pgrid_last_day)
 plt.plot(Pprod_shed_step_last_day)
 plt.plot(Pcons_unsatisfied_step_last_day)
-plt.legend(('Pnet_last_day', 'Pgrid_last_day ', 'Pprod_shed_step_last_day', 'Pcons_unsatisfied_step_last_day'),
-loc='best', shadow=True)
-plt.xlabel('Steps:(Houre)')
+plt.legend(('Pnet', 'Pgrid', 'Pprod_shed', 'Pcons_unsatisfied'), loc='best', shadow=True)
+plt.xlabel('Heure')
 plt.ylabel('Puissance')
+plt.xticks(ticks = np.arange(0,len(Statofcharge_last_day),12), labels = out)
 plt.grid(True)
 plt.show()
 
 plt.figure(2)
-plt.plot(reward_episode,'yo-')
-plt.xlabel('episods')
-plt.ylabel('cumulative rewards per episode')
-plt.title('Pénalité Par episode')
+performence_reward_slice.boxplot(grid=True)
+plt.xlabel('Nombre de fois application le Q_table pour " '+ str(nombr_jour_boxplot)+' " jours')
+plt.ylabel('Pénalité par groupe episodes de " '+ str(nombr_jour_boxplot)+' "jours')
+plt.title('Performence sur les rewards de " '+ str(nombr_jour_boxplot)+ ' " jours successifs')
 plt.show()
-plt.grid(True)
 
-plt.figure(3)
-plt.semilogy(performence_reward,'bo-')
-#plt.loglog(performence_reward,'bo-')
-plt.xlabel('episods')
-plt.ylabel('Pénalité par episode')
-plt.title('Performence sur reward')
-plt.show()
-plt.grid(True)
-
-#plt.figure(4)
-#plt.plot(performence_Pgrid,'bo-')
+#plt.figure(3)
+#plt.plot(reward_episode,'yo-')
 #plt.xlabel('episods')
-#plt.ylabel('Pgrid par episode')
-#plt.title('Performence par le coût')
+#plt.ylabel('cumulative rewards per episode')
+#plt.title('Pénalité Par episode')
+#plt.show()
+#plt.grid(True)
+#
+#plt.figure(4)
+#plt.semilogy(performence_reward,'bo-')
+#plt.xlabel('episods')
+#plt.ylabel('Pénalité par episode')
+#plt.title('Performence sur reward')
 #plt.show()
 #plt.grid(True)
 
+
+
+
 # %% Enregistrer le Q_table
-data_2write = pd.concat([Final_Q_table['GRID_OFF'],Final_Q_table['GRID_ON'] ],axis=1, join='inner', keys=['GRID_OFF','GRID_ON'] , sort=False)
-file_write = 'Q_table' + '.txt'
-sep_write = '\t'
-path_write = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
-data_2write.to_csv(os.path.join(path_write,file_write),sep=sep_write,index=True)
+#data_2write = pd.concat([Final_Q_table['GRID_OFF'],Final_Q_table['GRID_ON'] ],axis=1, join='inner', keys=['GRID_OFF','GRID_ON'] , sort=False)
+#file_write = 'Q_table' + '.txt'
+#sep_write = '\t'
+#path_write = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
+#data_2write.to_csv(os.path.join(path_write,file_write),sep=sep_write,index=True)
