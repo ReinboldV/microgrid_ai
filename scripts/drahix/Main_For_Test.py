@@ -19,7 +19,7 @@ start_day_month_test = 1
 n_jour_test = 7
 
 dt = 0.5  # [h] Pas de discrétisation du temps
-dp = 1400  # Pas de discrétisation de Puissance
+dp = 1400  # Pas de discrétisation de Puissance à partir de pas obtenu sur la phase Training
 Pnet_min, Pnet_max = -15400, 12600   # [W]
 SoC_min, SoC_max = 0, 21000  # [W.h] Capacité min et max de la batterie   
 
@@ -34,15 +34,15 @@ On prend une sample avec (le nombre de jour = n_episode) de notre data_base
 Chaque épisode présente un jour choisi par hazard dans notre database
 
 """
-data_path = r"C:\Users\mdini\Desktop\Test"
-first_day_database = '8/1/2018'
+data_path = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
+first_day_database = '1/1/2019'
 month = pd.Series(pd.date_range(first_day_database, freq='D', periods=31))
 
 data_base = pd.DataFrame({'Dates': month})
 data_base['Dates'] = data_base['Dates'].astype(str)
 
 #chosen_idx = np.random.choice(len(data_base), replace=True, size = n_jour_test)           # Choose days randomely
-chosen_idx = np.arange(start_day_month_test -1 , start_day_month_test + n_jour_test-1)     # Choose days by roders
+chosen_idx = np.arange(start_day_month_test -1 , start_day_month_test + n_jour_test-1)     # Choose days by orders
 
 sample_data_names = data_base.iloc[chosen_idx]
 
@@ -58,9 +58,9 @@ for i in range(1, n_jour_test):
     Testing_data = pd.concat([Testing_data, X], axis=0, join='inner', ignore_index=True)
 
 Pnet1 = ((Testing_data.Cons - Testing_data.Prod) // dp) * dp
-
+#Pnet1 = (Testing_data.Cons - Testing_data.Prod)
 #%% Récuperer la Q_Table obtenue par les données historiques
-file = 'Q_table_2mois_centmills'
+file = 'Q_table_20mills'
 file_read = file + '.txt'
 q_table = pd.read_csv(os.path.join(data_path, file_read), delimiter="\t")
 ####################################################################################################################  

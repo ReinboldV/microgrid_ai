@@ -88,7 +88,6 @@ class MicrogridSimulator:
 
         self.env = pd.concat([self.temp1, self.env1], axis=1)
         self.env = pd.concat([self.env, self.tarif], axis=1)
-
         i_time = int(round(self.Temp_ini / self.dt))
         i_soc = int(round((self.SOC_ini - self.SoC_min) / self.dp))
         i_Pnet = int(round((self.Pnet_ini - self.Pnet_min) / self.dp))

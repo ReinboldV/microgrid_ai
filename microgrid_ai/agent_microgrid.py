@@ -28,16 +28,20 @@ class Agent:
         self.exploration_rate = exploration_rate  # Initial exploration rate
         self.exploration_delta = exploration_rate / iterations  # Shift from exploration to exploitation
 
-    def get_next_action(self, state):
+    def get_next_action(self, state, indicat):
         """
         Choix du mode exploration ou exploitation :
         param state:
         return:
         """
-        if random.random() > self.exploration_rate:  # Explore (gamble) or exploit (greedy)
-            return self.greedy_action(state)
+        if (indicat == 'Train'):
+            
+            if random.random() > self.exploration_rate:  # Explore (gamble) or exploit (greedy)
+                return self.greedy_action(state)
+            else:
+                return self.random_action()
         else:
-            return self.random_action()
+            return self.greedy_action(state)
 
     def greedy_action(self, state):
         """
@@ -69,7 +73,7 @@ class Agent:
         else:
             return GRID_OFF
 
-    def update(self, old_state, new_state, action, reward):
+    def update(self, old_state, new_state, action, reward, indicat):
         """
         Update le Q-Table
 
@@ -79,19 +83,22 @@ class Agent:
         :param reward:
         :return:
         """
-
-        old_value = self.q_table.loc[old_state].values[action]  # Old Q-table value
-        #        print('q_table = ',self.q_table)
-        future_action = self.greedy_action(new_state)  # What would be our best next action?
-
-        future_reward = self.q_table.loc[new_state].values[future_action]  # What is reward for the best next action?
-
-        # Main Q-table updating algorithm:
-        new_value = old_value + self.learning_rate * (reward + self.discount * future_reward - old_value)
-
-        # TODO : modifier pour la colonne action : ['GRID_OFF', 'GRID_ON'][action] - > actions[action]
-        self.q_table.loc[old_state, ['GRID_OFF', 'GRID_ON'][action]] = new_value
-
-        # Finally, shift our exploration_rate toward zero (less gambling)
-        if self.exploration_rate > 0:
-            self.exploration_rate -= self.exploration_delta
+        if (indicat == 'Train'): 
+            
+            old_value = self.q_table.loc[old_state].values[action]  # Old Q-table value
+            #        print('q_table = ',self.q_table)
+            future_action = self.greedy_action(new_state)  # What would be our best next action?
+    
+            future_reward = self.q_table.loc[new_state].values[future_action]  # What is reward for the best next action?
+    
+            # Main Q-table updating algorithm:
+            new_value = old_value + self.learning_rate * (reward + self.discount * future_reward - old_value)
+    
+            # TODO : modifier pour la colonne action : ['GRID_OFF', 'GRID_ON'][action] - > actions[action]
+            self.q_table.loc[old_state, ['GRID_OFF', 'GRID_ON'][action]] = new_value
+    
+            # Finally, shift our exploration_rate toward zero (less gambling)
+            if self.exploration_rate > 0:
+                self.exploration_rate -= self.exploration_delta
+        else:
+            pass
