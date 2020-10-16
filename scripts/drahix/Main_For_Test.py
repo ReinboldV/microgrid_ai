@@ -35,7 +35,7 @@ Chaque épisode présente un jour choisi par hazard dans notre database
 
 """
 data_path = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
-first_day_database = '1/1/2019'
+first_day_database = '8/1/2018'
 month = pd.Series(pd.date_range(first_day_database, freq='D', periods=31))
 
 data_base = pd.DataFrame({'Dates': month})
@@ -58,7 +58,7 @@ for i in range(1, n_jour_test):
     Testing_data = pd.concat([Testing_data, X], axis=0, join='inner', ignore_index=True)
 
 Pnet1 = ((Testing_data.Cons - Testing_data.Prod) // dp) * dp
-#Pnet1 = (Testing_data.Cons - Testing_data.Prod)
+
 #%% Récuperer la Q_Table obtenue par les données historiques
 file = 'Q_table_20mills'
 file_read = file + '.txt'
@@ -68,6 +68,7 @@ q_table = pd.read_csv(os.path.join(data_path, file_read), delimiter="\t")
 t0 = time.time()
 # %% Initialisation de l'environement et l'espace d'état:
 n_points = len(Pnet1)
+n_jours = int( n_points / (24 / dt) )
 Temp_ini = 0
 Pnet_ini = Pnet1[0]
 #Pnet_min, Pnet_max = min(Pnet1),max(Pnet1)  # [W]
@@ -125,25 +126,28 @@ Heures creuses = 22h jusqu'à 6h
 Heures plaines = 6h jusqu'à 22h
 """  
 Creuse_part_1 , Creuse_part_2, Plaine_part = 0 , 0, 0
-for i in range(int(6/dt)):
-    Creuse_part_1 += Pgrid_step[i] 
-    
-for i in range(int(22/dt),int(24/dt)):
-   Creuse_part_2 += Pgrid_step[i] 
-   
-for i in range(int(6/dt),int(22/dt)):
-    Plaine_part += Pgrid_step[i]
-        
-Pgrid_out_creuse = (Creuse_part_1+Creuse_part_2) / 1000                  # Division par 1000 pour mettre les valeurs en kWh 
-Pgrid_out_plaine = Plaine_part / 1000                                    # Division par 1000 pour mettre les valeurs en kWh 
-Pcons_unsatisfied_out=np.cumsum(Pcons_unsatisfied_step)/1000    # Division par 1000 pour mettre les valeurs en kWh 
 
-Cout_achat = Cout_grid_Creuse * Pgrid_out_creuse + Cout_grid_plaine *Cout_grid_plaine
-Cout_unsatisfied = - C_conso_unsatisfied * Pcons_unsatisfied_out[-1]
+for i in range (n_jours):
+    
+    for j in range  (int(6/dt)):
+        Creuse_part_1 += Pgrid_step[ i*int(24/dt) + j]  / 1000    # Division par 1000 pour mettre les valeurs en kWh 
+    
+    for j in range(int(6/dt),int(22/dt)):
+        Plaine_part += Pgrid_step[ i*int(24/dt) + j]  / 1000      # Division par 1000 pour mettre les valeurs en kWh 
+        
+    for j in range(int(22/dt),int(24/dt)):
+        Creuse_part_2 += Pgrid_step[ i *int (24/dt) + j]  / 1000  # Division par 1000 pour mettre les valeurs en kWh 
+       
+Pgrid_out_creuse = (Creuse_part_1+Creuse_part_2)                   
+Pgrid_out_plaine = Plaine_part                                     
+Pcons_unsatisfied_out=np.cumsum(Pcons_unsatisfied_step) / 1000     # Division par 1000 pour mettre les valeurs en kWh 
+
+Cout_achat = ( Cout_grid_Creuse * Pgrid_out_creuse * dt ) + ( Cout_grid_plaine * Cout_grid_plaine * dt )
+Cout_unsatisfied = - C_conso_unsatisfied * Pcons_unsatisfied_out[-1] * dt
 Ctotal = Cout_achat + Cout_unsatisfied
 print(' Cout Achat de grid = {} \n Cout demande unsatisfied = {} \n Cout_Total = {}'.format(Cout_achat, Cout_unsatisfied, Ctotal) ,'Euros')
-############################################################################################################
-# %% Affichage
+
+#%% Préparation de xticks:
 freq_heur_affich = 6
 step_xtick= 2*freq_heur_affich # Il faut mettre une valeure deux fois plus que freq_affich
 freq_affich = str(freq_heur_affich)+'H'
@@ -152,11 +156,12 @@ rng=pd.DataFrame({'rng': rng})
 rng=rng['rng'].astype(str)
 out = [x[11:-3] for x in rng]
 
+# %% Affichage
 plt.figure(1)
 plt.subplot(211)
 plt.plot(Statofcharge)
 plt.xlabel('Heure')
-plt.ylabel('Energie')
+plt.ylabel('Energie (Wh)')
 plt.xticks(ticks = np.arange(0,len(Statofcharge),step_xtick), labels = out)
 plt.title('Bilan de Gestion Energie Par RL en appliquant Q_table obtenue sur " '+str(n_jour_test)+' " jours')
 plt.legend((' SoC % '), loc='best', shadow=True)
@@ -169,7 +174,7 @@ plt.plot(Pprod_shed_step)
 plt.plot(Pcons_unsatisfied_step)
 plt.legend(('Pnet', 'Pgrid', 'Pprod_shed', 'Pcons_unsatisfied'), loc='best', shadow=True)
 plt.xlabel('Heure')
-plt.ylabel('Puissance')
+plt.ylabel('Puissance (W)')
 plt.xticks(ticks = np.arange(0,len(Statofcharge),12), labels = out)
 plt.grid(True)
 plt.show()

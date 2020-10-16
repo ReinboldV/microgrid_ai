@@ -27,6 +27,7 @@ def database(months_of_train, months_of_test, nombr_jour_Train, nombr_jour_Test)
     database_train = [] 
     day_database_test = []
     database_test = []
+    
     #Créer le database de training:
     for i in range (len(months_of_train)):         
         day_database_train.append(months_of_train[i])      
@@ -47,6 +48,7 @@ def database(months_of_train, months_of_test, nombr_jour_Train, nombr_jour_Test)
         X = pd.read_csv(os.path.join(data_path, str(sample_data_names_train.Dates[i])), delimiter="\t")
         X = X.drop(X.index[len(X) - 1])
         Training_data = pd.concat([Training_data, X], axis=0, join='inner', ignore_index=True)  
+
 
     # Créer la database de testing:
     for i in range (len(months_of_test)):         
@@ -72,7 +74,7 @@ def database(months_of_train, months_of_test, nombr_jour_Train, nombr_jour_Test)
         
     Pnet1_brut = (Training_data.Cons - Training_data.Prod)   
     Pnet_min_brut, Pnet_max_brut = min(Pnet1_brut), max(Pnet1_brut)  # [W]    
-    dp = np.round(percent_pas* (Pnet_max_brut - Pnet_min_brut))//10*10   # Pas de discrétisation de Puissance
+    dp = np.round( percent_pas * (Pnet_max_brut - Pnet_min_brut))// 10 * 10   # Pas de discrétisation de Puissance
     
     Pnet1_train = ((Training_data.Cons - Training_data.Prod) // dp) * dp
     Pnet1_test = ((Testini_data.Cons - Testini_data.Prod) // dp) * dp
@@ -101,19 +103,19 @@ def algo (dt, Cout_grid_Creuse, Cout_grid_plaine, Cout_conso_unsatisfied, cout_a
         
         
         if (int(6/dt) <= step < int(22/dt)):
-            cout_achat = Cout_grid_plaine * Pgrid
+            cout_achat = Cout_grid_plaine * (Pgrid/1000) * dt
         else:
-            cout_achat = Cout_grid_Creuse * Pgrid
+            cout_achat = Cout_grid_Creuse * (Pgrid/1000) * dt
             
-        cout_insatisfait = - Cout_conso_unsatisfied * Pcons_unsatisfied 
+        cout_insatisfait = - Cout_conso_unsatisfied * (Pcons_unsatisfied/1000) * dt
         
         total_reward += reward
             
         total_Pgrid += Pgrid
         
-        cout_achat_episode += cout_achat/1000
+        cout_achat_episode += cout_achat 
         
-        cout_insatisfait_episode += cout_insatisfait/1000
+        cout_insatisfait_episode += cout_insatisfait 
         
         totale_cout += (cout_achat_episode + cout_insatisfait_episode) 
         
@@ -139,6 +141,8 @@ def algo (dt, Cout_grid_Creuse, Cout_grid_plaine, Cout_conso_unsatisfied, cout_a
     return reward_episode, Pgrid_episode, performence
  
 # %% Initialisation de nombre d'épisodes et la taille d'actions possible(Grid_On ou Grid_OFF):
+"""
+"""
 n_episode = 2000
 nombr_jour_Train = n_episode
 n_jour_visio = 7
@@ -179,8 +183,8 @@ SOC_ini = int(np.random.choice(SoC))  # Choisir l'état initiale par hazard
 Pnet = np.linspace(Pnet_min, Pnet_max, n_Pnet)
 
 # Initialisation de l'agent :
-learning_rate = 0.9
-discount = 0.95
+learning_rate    = 0.9
+discount         = 0.95
 exploration_rate = 1
 iterations = n_episode * n_points
 
@@ -216,8 +220,8 @@ Pcons_unsatisfied_step_last_day = np.zeros(n_jour_visio * n_points)
 for episode in range(n_episode):
     
     total_reward = 0
-    total_Pgrid = 0
-    totale_cout = 0
+    total_Pgrid  = 0
+    totale_cout  = 0
     cout_achat_episode = 0
     cout_insatisfait_episode = 0
 
@@ -311,10 +315,11 @@ for i in range ((n_SOC-1)*int(dp),int(-dp),int(-dp)):
         Table_ON_heat.loc[i,j] = heat_q_table.loc[index_heat,'GRID_ON']
         Table_OFF_heat.loc[i,j] = heat_q_table.loc[index_heat,'GRID_OFF']
         Table_diff_heat.loc[i,j]= q_table_diff_heat.loc[index_heat,'q_table_diff'] 
+        
 # %% préparation de boxplot:
 performence_slice = split_list(performence, wanted_parts=int(n_episode/delta_episode_performence))
 performence_slice = np.transpose(performence_slice)
-performence_slice= pd.DataFrame(performence_slice, columns=(np.arange(n_episode/delta_episode_performence)+1) )  
+performence_slice = pd.DataFrame(performence_slice , columns=(np.arange(n_episode/delta_episode_performence)+1) )
 
 #%% Préparation de xticks:
 
@@ -325,13 +330,14 @@ rng = pd.Series(pd.date_range(months_of_train[0], freq=freq_affich, periods = n_
 rng=pd.DataFrame({'rng': rng})
 rng=rng['rng'].astype(str)
 out = [x[11:-3] for x in rng]
+
 # %% Affichage
 
 plt.figure(1)
 plt.subplot(211)
 plt.plot(Statofcharge_last_day)
 plt.xlabel('Heure')
-plt.ylabel('Energie')
+plt.ylabel('Energie (Wh)')
 plt.xticks(ticks = np.arange(0,len(Statofcharge_last_day),step_xtick), labels = out)
 plt.title('Bilan de Gestion Energie Par RL pour "' + str(n_jour_visio) + '" derniers jours')
 plt.legend((' SoC % '), loc='best', shadow=True)
@@ -344,7 +350,7 @@ plt.plot(Pprod_shed_step_last_day)
 plt.plot(Pcons_unsatisfied_step_last_day)
 plt.legend(('Pnet', 'Pgrid', 'Pprod_shed', 'Pcons_unsatisfied'), loc='best', shadow=True)
 plt.xlabel('Heure')
-plt.ylabel('Puissance')
+plt.ylabel('Puissance (W)')
 plt.xticks(ticks = np.arange(0,len(Statofcharge_last_day),12), labels = out)
 plt.grid(True)
 plt.show()
