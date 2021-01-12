@@ -1,13 +1,17 @@
-""" la classe de l'environement"""
-
-"""Cette partie represent la classe de l'environement dans laquelle notre agent va faire une action pris dans ma class Agent.
-Il fait son observation, il passe à l'étape suivant et reçois la recompence associé à la décision choisi dans son état.
-La fonction objectif est diminuer le cout d'achat d'électricité sur le réseau publique toute en respectant les contraints opérationnelles du système.
-Les contraints sont: 1- Eviter l'injecter énergie sur le réseau (Cinject_grid) quand microgrid est connecté au réseau
-                     2- Eviter de Vider la batterie (Ccons_unsatisfied) quand le système est isolé
-                     3- Eviter de faire le shedding de production solaire (Cbatful) quand le système est isolé 
+""" class of environmentla """
 
 """
+This part represents the class of the environment in which our agent will do an action taken in my class Agent.
+He makes his observation, he goes to the next step and receives the reward associated with the decision chosen in his state.
+The objective function is to reduce the cost of purchasing electricity on the public network while respecting the operational constraints of the system.
+The constraints are:  1- Avoid injecting energy into the network (Cinject_grid) when microgrid is connected to the network
+                      2- Avoid draining the battery (Ccons_unsatisfied) when the system is isolated
+                      3- Avoid shedding solar production (Cbatful) when the system is isolated
+
+"""
+
+
+
 import numpy as np
 import pandas as pd
 
@@ -95,11 +99,43 @@ class MicrogridSimulator:
         self.index_ini = self.n_Pnet * (i_time * self.n_SoC + i_soc) + i_Pnet
 
         self.index_state = self.index_ini
-
-    # Verifier les contraints et recevoir la pénalité et la nouvelle situation de l'agent :
-    def take_action(self, action, pnet):
-        """
         
+        
+        
+        
+        
+    def calcule_reel_p(self, teau_incertitude, i_Pnet2, Pnet):
+        """
+         This Function considers the uncertainty of the prediction into count
+         and calculates the reel Pnet compared to the predicted Pnet:
+         It receives the index from Pnet at each moment and it considers
+             a probability of (1 - teau_incertitude)% for the case (prediction is realized in reality)
+             a probability of (teau_incertitude / 2)% for the case of under-production
+             a probability of (teau_incertitude / 2)% for the case of over-production 
+        """
+        i_Preel = 0
+        x = np.random.random()
+        
+        if (x > (teau_incertitude/100)):
+            i_Preel = i_Pnet2
+                    
+        elif(((teau_incertitude/100)/2) < x <= (teau_incertitude/100)):
+            i_Preel = i_Pnet2 - 1
+            if (i_Preel < 0):
+                i_Preel = 0 
+                
+        elif(x <= ((teau_incertitude/100)/2)):
+            i_Preel = i_Pnet2 + 1
+            if (i_Preel > len(Pnet)-1):
+                i_Preel = len(Pnet)-1
+                
+        P_reel = Pnet [i_Preel]
+
+        return P_reel
+
+    # Check the constraints and receive the penalty and the new state :
+    def take_action(self,teau_incertitude, action, pnet):
+        """
         :param action: action of the agent at time t
         :param pnet: net power demand at time t
         :return: 
@@ -115,11 +151,14 @@ class MicrogridSimulator:
         Pgrid = 0
         Pprod_shed = 0
         Pcons_unsatisfied = 0
+        
+        P_reel = self.calcule_reel_p (teau_incertitude, i_Pnet2, self.Pnet)
 
         if action == GRID_ON:  # Grid connexion ON
             SOC1 = SOC  # Battery SOC unchanged
 
-            Pgrid = self.Pnet[i_Pnet2]  # = pnet(t-1)
+#            Pgrid = self.Pnet[i_Pnet2]  
+            Pgrid = P_reel
 
             if self.env.at[self.index_state, 'Tarif'] == 'HP':
                 reward = -self.Cgrid_use_plaine * Pgrid
@@ -134,8 +173,9 @@ class MicrogridSimulator:
 
         elif action == GRID_OFF:  # Grid connexion OFF
 
-            Pbatt = self.Pnet[i_Pnet2]  # Charge or discharge battery according to the sign of Pnet
-            SOC1 = SOC - Pbatt  # Le niveau de charge de la batterie
+#            Pbatt = self.Pnet[i_Pnet2]  # Charge or discharge battery according to the sign of Pnet
+            Pbatt = P_reel
+            SOC1 = SOC - Pbatt  # The battery charge level
             reward = -self.Cbat_use * Pbatt
 
             # A prévoir ici : reward fonction for Pprod_shed               
@@ -161,7 +201,7 @@ class MicrogridSimulator:
         
         self.index_state = index_state
         
-        return index_state, reward, Pgrid, Pprod_shed, Pcons_unsatisfied
+        return index_state, reward, P_reel, Pgrid, Pprod_shed, Pcons_unsatisfied
 
     def set_state(self, SOC, Pnet, T):
         """
@@ -183,18 +223,3 @@ class MicrogridSimulator:
         i_Pnet = int(round((Pnet - self.Pnet_min) / self.dp))
         self.index_state = self.n_Pnet * (i_time * self.n_SoC + i_soc) + i_Pnet
         return self.index_state
-
-    def get_soc_time_pnet(self):
-        i_Pnet2 = self.index_state % self.n_Pnet
-        residu = self.index_state // self.n_Pnet
-        i_soc2 = residu % self.n_SoC
-        i_time2 = residu // self.n_SoC
-
-        time = self.Time[i_time2]
-        soc = self.SoC[i_soc2]
-        pnet = self.Pnet[i_Pnet2]
-
-        return soc, time, pnet
-
-
-
