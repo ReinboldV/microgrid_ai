@@ -40,7 +40,6 @@ class MicrogridSimulator:
         self.state_SOC = pd.DataFrame({'state_SOC': self.state_SOC})
         self.state_SOC = [self.state_SOC] * (self.n_Time)
         self.state_SOC = pd.concat(self.state_SOC, ignore_index=True)
-
         i_time = int(round(self.Temp_ini / self.dt))
         i_soc  = int(round((self.SOC_ini - self.SoC_min) / self.dp))
         i_Pnet = int(round((self.Pnet_ini - self.Pnet_min) / self.dp))
@@ -63,7 +62,7 @@ class MicrogridSimulator:
         Pgrid = 0
         Pprod_shed = 0
         Pcons_unsatisfied = 0
-        
+         
         if action == GRID_ON :                               # Grid connexion ON
             SOC1 = SOC                                       # Battery SOC unchanged
             Pgrid = self.Pnet[i_Pnet2]
