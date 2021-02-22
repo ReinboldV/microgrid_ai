@@ -93,7 +93,7 @@ def split_list(alist, wanted_parts):
              for i in range(wanted_parts) ]
 
 #%% 
-def algo (teau_incertitude, dt, Cout_grid_Creuse, Cout_grid_plaine, Cout_conso_unsatisfied, cout_achat_episode, cout_insatisfait_episode, total_reward, total_Pgrid, totale_cout, Pnet1, indicat, episode, n_points,):
+def algo (teau_incertitude, dt, Cout_grid_Creuse, Cout_grid_plaine, Cout_conso_unsatisfied, cout_achat_episode, cout_insatisfait_episode, total_reward, total_Pgrid, totale_cout, Pnet1, indicat, episode, n_points):
 
     for step in range(n_points):
             
@@ -150,11 +150,11 @@ def algo (teau_incertitude, dt, Cout_grid_Creuse, Cout_grid_plaine, Cout_conso_u
 """
 """
 n_episode = 100
-teau_incertitude = 80  #It must be in percentage
+teau_incertitude = 0  #It must be in percentage
 nombr_jour_Train = n_episode
 n_jour_visio = 7
 delta_episode_performence = int(n_episode/10)
-nombr_jour_boxplot = 6
+nombr_jour_boxplot = 1
 nombr_jour_Test =  nombr_jour_boxplot * int( n_episode / delta_episode_performence )
 dt = 0.5  # [h] Step discretization of time
 percent_pas = 0.05 # Percentage for the step discretization of Power

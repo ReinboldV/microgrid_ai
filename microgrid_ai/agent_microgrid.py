@@ -13,21 +13,36 @@ import pandas as pd
 GRID_OFF = 0
 GRID_ON = 1
 
+"""
+#class Agent:
+#    def __init__(self, n_state, n_episode, learning_rate, discount,
+#                 exploration_rate, iterations, actions):
+#
+#        self.n_episode = n_episode
+#        self.n_state = n_state
+#        self.actions = actions
+#        self.q_table = pd.DataFrame(0, index=np.arange(n_state), columns=self.actions.values())
+#        self.learning_rate = learning_rate  # How much we appreciate new q-value over current
+#        self.discount = discount  # How much we appreciate future reward over current
+#        self.iterations = iterations
+#        self.exploration_rate = exploration_rate  # Initial exploration rate
+#        self.exploration_delta = exploration_rate / iterations  # Shift from exploration to exploitation
+
+"""
 
 class Agent:
     def __init__(self, n_state, n_episode, learning_rate, discount,
-                 exploration_rate, iterations, actions):
+                 exploration_rate, iterations, q_table ):
 
         self.n_episode = n_episode
         self.n_state = n_state
-        self.actions = actions
-        self.q_table = pd.DataFrame(0, index=np.arange(n_state), columns=self.actions.values())
+        self.q_table = q_table 
         self.learning_rate = learning_rate  # How much we appreciate new q-value over current
         self.discount = discount  # How much we appreciate future reward over current
         self.iterations = iterations
         self.exploration_rate = exploration_rate  # Initial exploration rate
         self.exploration_delta = exploration_rate / iterations  # Shift from exploration to exploitation
-
+        
     def get_next_action(self, state, indicat):
         """
         Choix du mode exploration ou exploitation :
