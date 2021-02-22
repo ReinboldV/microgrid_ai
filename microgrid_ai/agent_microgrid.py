@@ -7,28 +7,9 @@ Dans cette parti on présent notre agent et on construit la Q-Table :
 """
 import random
 
-import numpy as np
-import pandas as pd
-
 GRID_OFF = 0
 GRID_ON = 1
 
-"""
-#class Agent:
-#    def __init__(self, n_state, n_episode, learning_rate, discount,
-#                 exploration_rate, iterations, actions):
-#
-#        self.n_episode = n_episode
-#        self.n_state = n_state
-#        self.actions = actions
-#        self.q_table = pd.DataFrame(0, index=np.arange(n_state), columns=self.actions.values())
-#        self.learning_rate = learning_rate  # How much we appreciate new q-value over current
-#        self.discount = discount  # How much we appreciate future reward over current
-#        self.iterations = iterations
-#        self.exploration_rate = exploration_rate  # Initial exploration rate
-#        self.exploration_delta = exploration_rate / iterations  # Shift from exploration to exploitation
-
-"""
 
 class Agent:
     def __init__(self, n_state, n_episode, learning_rate, discount,
@@ -42,7 +23,7 @@ class Agent:
         self.iterations = iterations
         self.exploration_rate = exploration_rate  # Initial exploration rate
         self.exploration_delta = exploration_rate / iterations  # Shift from exploration to exploitation
-        
+
     def get_next_action(self, state, indicat):
         """
         Choix du mode exploration ou exploitation :
@@ -101,7 +82,7 @@ class Agent:
         if (indicat == 'Train'): 
             
             old_value = self.q_table.loc[old_state].values[action]  # Old Q-table value
-            #        print('q_table = ',self.q_table)
+
             future_action = self.greedy_action(new_state)  # What would be our best next action?
     
             future_reward = self.q_table.loc[new_state].values[future_action]  # What is reward for the best next action?
@@ -111,6 +92,8 @@ class Agent:
     
             # TODO : modifier pour la colonne action : ['GRID_OFF', 'GRID_ON'][action] - > actions[action]
             self.q_table.loc[old_state, ['GRID_OFF', 'GRID_ON'][action]] = new_value
+            
+            self.q_table.loc[old_state, ['visit_counter_Grid_OFF','visit_counter_Grid_ON'][action]] = self.q_table.loc[old_state, ['visit_counter_Grid_OFF','visit_counter_Grid_ON'][action]]+ 1 
     
             # Finally, shift our exploration_rate toward zero (less gambling)
             if self.exploration_rate > 0:

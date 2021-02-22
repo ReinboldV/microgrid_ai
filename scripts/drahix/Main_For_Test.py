@@ -5,6 +5,8 @@ Created on Fri May 15 10:30:13 2020
 
 @author: mdini
 """
+
+
 import numpy as np
 import pandas as pd
 import time
@@ -14,10 +16,32 @@ from microgrid_ai.agent_microgrid_test import Agent
 from microgrid_ai.microgrid_simulator_test import MicrogridSimulator
 plt.close('all')
 
+def calcule_reel_p(teau_incertitude, Pnet_1, dp):
+    """
+     This Function considers the uncertainty of the prediction into count
+     and calculates the reel Pnet compared to the predicted Pnet:
+     It receives the index from Pnet at each moment and it considers
+         a probability of (1 - teau_incertitude)% for the case (prediction is realized in reality)
+         a probability of (teau_incertitude / 2)% for the case of under-production
+         a probability of (teau_incertitude / 2)% for the case of over-production 
+    """
+    x = np.random.random()
+    
+    if (x > (teau_incertitude/100)):
+        Pnet1 = Pnet_1
+                
+    elif(((teau_incertitude/100)/2) < x <= (teau_incertitude/100)):
+        Pnet1 = Pnet_1 - dp
+            
+    elif(x <= ((teau_incertitude/100)/2)):
+        Pnet1 = Pnet_1 + dp
+        
+    return Pnet1
 # %% Initialization of environment and state space:
-first_day_of_database = '8/1/2016'
+first_day_of_database = '10/1/2018'
 start_day_of_month_test = 1
-n_jour_test = 7
+n_jour_test = 20
+teau_incertitude = 0
 
 # le tarif bleu du réseau :
 C_conso_unsatisfied = 10  # euros par KWh
@@ -30,8 +54,8 @@ SOC_ini = 10500                                  # Choisir l'état initiale manu
 #%% Récuperer la Q_Table obtenue par les données historiques
 #This information is available from the training phase:
 data_path = r"C:\Users\mdini\Documents\GitHub\microgrid_ai\data\drahix"
-file = 'Q_table_Predict_2000 episodes_20 percent incertity'
-info = 'information_Q_table_Predict_2000 episodes_20 percent incertity'
+file = 'Q_table_Predict_100 episodes_20 percent incertity_mode_3'
+info = 'information_Q_table_Predict_100 episodes_20 percent incertity_mode_3'
 file_read = file + '.txt'
 info_read = info + '.txt'
 q_table = pd.read_csv(os.path.join(data_path, file_read), delimiter="\t")
@@ -42,7 +66,7 @@ Pnet_min_q_table = infos.loc[0]['Pnet_min_q_table']  # [W]
 Pnet_max_q_table = infos.loc[0]['Pnet_max_q_table']  # [W]
 SoC_min = infos.loc[0]['SoC_min'] # [W.h] Capacité min de la batterie 
 SoC_max = infos.loc[0]['SoC_max'] # [W.h] Capacité max de la batterie 
-
+n_Pnet_q_table = int((Pnet_max_q_table - Pnet_min_q_table) /dp + 1)
 # %% Récupérer les données historiques de Pnet = Pload - Ppv  (Toutes les 30 minutes) :
 """
 On prend une sample avec (le nombre de jour = n_episode) de notre data_base
@@ -54,7 +78,7 @@ month = pd.Series(pd.date_range(first_day_of_database, freq='D', periods=31))
 data_base = pd.DataFrame({'Dates': month})
 data_base['Dates'] = data_base['Dates'].astype(str)
 
-#chosen_idx = np.random.choice(len(data_base), replace=True, size = n_jour_test)           # Choose days randomely
+#chosen_idx = np.random.choice(len(data_base), replace=True, size = n_jour_test)                 # Choose days randomely
 chosen_idx = np.arange(start_day_of_month_test -1 , start_day_of_month_test + n_jour_test-1)     # Choose days by orders
 
 sample_data_names = data_base.iloc[chosen_idx]
@@ -70,34 +94,53 @@ for i in range(1, n_jour_test):
     X = X.drop(X.index[len(X) - 1])
     Testing_data = pd.concat([Testing_data, X], axis=0, join='inner', ignore_index=True)
 
-Pnet1 = ((Testing_data.Cons - Testing_data.Prod) // dp) * dp
+Pnet_1 = ((Testing_data.Cons - Testing_data.Prod) // dp) * dp
+Pnet1  = np.zeros(len(Pnet_1))
+for i in range(len(Pnet_1)):
+    Pnet1[i] = calcule_reel_p (teau_incertitude, Pnet_1[i], dp)
 
 #%% Initialisation de l'environement et l'espace d'état:
 n_points = len(Pnet1)
 n_jours = int( n_points / (24 / dt) )
 Temp_ini = 0
 Pnet_ini = Pnet1[0]
-Pnet_min, Pnet_max = min(Pnet1),max(Pnet1)  # [W]
+Pnet_min, Pnet_max = min( min(Pnet1),Pnet_min_q_table), max(max(Pnet1),Pnet_max_q_table)  # [W]
 n_Time = int(round(24./dt))
 n_Pnet = int((Pnet_max - Pnet_min)/dp+1)
-n_SOC = int((SoC_max/dp)+1)
-n_state = n_SOC*n_Pnet*n_Time                     # Initialisation de la taille de l'espace d'état
-SoC = np.linspace(SoC_min,SoC_max,n_SOC)          # SOC array
+
+n_SOC = int(((SoC_max - SoC_min) / (dp * dt)) + 1)
+SoC = np.linspace(SoC_min, SoC_max, n_SOC)
+n_state = n_SOC * n_Pnet * n_Time  # the size of the state space
 Pnet = np.linspace(Pnet_min,Pnet_max,n_Pnet)      # Pnet array
 
-#%% Test of compatibility of Q_table
+#%%  Test of compatibility of Q_table with testing database
+q_tablee = []
 if (Pnet_min_q_table > Pnet_min):
-    add_head = (abs(Pnet_min_q_table - Pnet_min))/dp
-    add_head_q_table = add_head*n_SOC*n_Time
-    head_part= pd.DataFrame(0, index=np.arange(add_head_q_table), columns={'Unnamed: 0','GRID_OFF','GRID_ON'})
-    q_table = pd.concat([head_part, q_table], axis=0, join='inner', ignore_index=True)
+    add_head_num = int((abs(Pnet_min_q_table - Pnet_min))/dp) # combien Pnet à ajouter
+    add_head = pd.DataFrame(np.array([[0,200,0]]), columns=['Unnamed: 0','GRID_OFF','GRID_ON'] )
+    add_head = pd.concat([add_head]*add_head_num, ignore_index=True)
+    for i in range (len(q_table)):
+        if (i % n_Pnet_q_table) == 0 :
+            q_tablee.append(pd.concat([add_head,q_table[i:i+n_Pnet_q_table]], ignore_index=True))
+    q_table = pd.concat(q_tablee)       
+    q_table = q_table.reset_index(drop=True)
     
-elif(Pnet_max_q_table < Pnet_max):
-    add_fin = (abs(Pnet_max_q_table - Pnet_max))/dp
-    add_fin_q_table = add_fin*n_SOC*n_Time
-    fin_part = pd.DataFrame(0, index=np.arange(add_fin_q_table), columns={'Unnamed: 0','GRID_OFF','GRID_ON'})
-    q_table = pd.concat([q_table,fin_part], axis=0, join='inner', ignore_index=True)
-
+if(Pnet_max_q_table < Pnet_max):
+    add_fin_num = int ((abs(Pnet_max_q_table - Pnet_max))/dp )# combien Pnet à ajouter   
+   # SOC > 50%:
+    add_fin_1 = pd.DataFrame(np.array([[0,200,0]]), columns=['Unnamed: 0','GRID_OFF','GRID_ON'] )
+    add_fin_1 = pd.concat([add_fin_1]*add_fin_num, ignore_index=True)
+   # SOC < 50%:
+    add_fin_2 = pd.DataFrame(np.array([[0,0,200]]), columns=['Unnamed: 0','GRID_OFF','GRID_ON'] )
+    add_fin_2 = pd.concat([add_fin_2]*add_fin_num, ignore_index=True)
+    for i in range (len(q_table)//2):
+        if (i % n_Pnet_q_table) == 0 :
+            q_tablee.append(pd.concat([q_table[i:i+n_Pnet_q_table],add_fin_2], ignore_index=True))     
+    for i in range ((len(q_table)//2), len(q_table)):  
+        if (i % n_Pnet_q_table) == 0 :
+            q_tablee.append(pd.concat([q_table[i:i+n_Pnet_q_table],add_fin_1], ignore_index=True))
+    q_table = pd.concat(q_tablee)       
+    q_table = q_table.reset_index(drop=True)
 
 #%% Construire de l'environement et l'agent:
 microgrid = MicrogridSimulator(n_Time, Pnet_ini, SOC_ini, Temp_ini, Pnet, SoC,n_Pnet,n_SOC, dp, SoC_min, Pnet_min, dt)
@@ -171,10 +214,10 @@ out = [x[11:-3] for x in rng]
 # %% Affichage
 plt.figure(1)
 plt.subplot(211)
-plt.plot(Pnet1)
-plt.plot(Pgrid_step)
+plt.plot(Pnet1,'-.')
+plt.plot(Pgrid_step,'--')
 plt.plot(Pprod_shed_step)
-plt.plot(Pcons_unsatisfied_step)
+plt.plot(Pcons_unsatisfied_step,'-')
 plt.title('Energy Management Report for RL by applying Q_table obtained by Training Phase')
 plt.legend(('Pnet', 'Pgrid', 'Pprod_shed', 'Pcons_unsatisfied'), loc='best', shadow=True)
 plt.xlabel('Hour')
@@ -189,6 +232,4 @@ plt.ylabel('Energy (Wh)')
 plt.xticks(ticks = np.arange(0,len(Statofcharge),step_xtick), labels = out)
 plt.legend(('SOC (\%)'), loc='best')
 plt.grid(True)
-plt.show()
-
-
+plt.show() 

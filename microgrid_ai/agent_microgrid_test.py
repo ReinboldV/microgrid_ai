@@ -16,7 +16,6 @@ class Agent:
     def __init__(self, q_table):
 
         self.q_table = q_table
-#        print(self.q_table)
 ###################################################################################################################
 #%% Choisir le mode esploration ou exploitation:
     def get_next_action(self, state):

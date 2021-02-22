@@ -41,7 +41,7 @@ class MicrogridSimulator:
         self.state_SOC = [self.state_SOC] * (self.n_Time)
         self.state_SOC = pd.concat(self.state_SOC, ignore_index=True)
         i_time = int(round(self.Temp_ini / self.dt))
-        i_soc  = int(round((self.SOC_ini - self.SoC_min) / self.dp))
+        i_soc = int(round((self.SOC_ini - self.SoC_min) / (self.dp*self.dt)))
         i_Pnet = int(round((self.Pnet_ini - self.Pnet_min) / self.dp))
         
         self.index_ini = self.n_Pnet * (i_time * self.n_SoC + i_soc) + i_Pnet
@@ -72,24 +72,22 @@ class MicrogridSimulator:
                 Pgrid = 0
             
         elif action == GRID_OFF:                            # Grid connexion OFF
-            Pbatt = self.Pnet[i_Pnet2]                                      # Charge or discharge battery according to the sign of Pnet
-            SOC1 = SOC - Pbatt                              # Le niveau de charge de la batterie                             
-               
+            Pbatt = self.Pnet[i_Pnet2]                                      # Charge or discharge battery according to the sign of Pnet                           
+            SOC1 = SOC - (int(Pbatt*self.dt))  # The battery charge level
             # A prévoir ici : reward fonction for Pprod_shed               
             if  SOC1 > self.SoC[-1] :                       # Battery too full, cannot absorb Pnet
-                Pnet_actual = SOC1 - self.SoC[-1]           # Pnet actually stored
+                Pnet_actual = (SOC1 - self.SoC[-1] )/self.dt # Pnet actually stored
                 SOC1 = self.SoC[-1]                         # Battery state of charge limitation
                 Pprod_shed = - Pnet_actual                  # Loss of production (negative value)
                 
             # A prévoir ici : reward fonction de Pnet_unsatisfied
             if SOC1 < self.SoC[0] :                        # Not enough energy in the battery to provide Pnet
-                Pnet_actual = SOC1 - self.SoC[0]           # Pnet actually need 
+                Pnet_actual = (SOC1 - self.SoC[0])/self.dt # Pnet actually need
                 SOC1 = self.SoC[0]                         # Battery state of charge limitation
                 Pcons_unsatisfied = Pnet_actual            # Unsatisfied consumption (negative value)
             elif action == 'fiftyfifty':
                 pass
-                
-                
+            
         T = (T+1) % self.n_Time
 
         index_state = self.set_state ( SOC1 , Pnet1, T )
@@ -108,9 +106,7 @@ class MicrogridSimulator:
             return -1
 
         i_time = int(T)
-        i_soc  = int(round((SOC-self.SoC_min)/self.dp))
+        i_soc = int(round((SOC - self.SoC_min) / (self.dp*self.dt)))
         i_Pnet = int(round((Pnet-self.Pnet_min)/self.dp))
         self.index_state = self.n_Pnet * (i_time*self.n_SoC + i_soc) + i_Pnet
         return self.index_state         
-    
-    
