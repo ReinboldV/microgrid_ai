@@ -147,6 +147,7 @@ def split_list(alist, wanted_parts):
 def algo(teau_incertitude, dt, Cout_grid_Creuse, Cout_grid_plaine, Cout_conso_unsatisfied,
          cout_achat_episode, cout_insatisfait_episode, total_reward, total_Pgrid,
          totale_cout, Pnet1, indicat, episode, n_points):
+    
     for step in range(n_points):
 
         old_state = microgrid.index_state
@@ -155,8 +156,7 @@ def algo(teau_incertitude, dt, Cout_grid_Creuse, Cout_grid_plaine, Cout_conso_un
 
         new_state, reward, P_reel, Pgrid, Pprod_shed, Pcons_unsatisfied = microgrid.take_action(teau_incertitude,
                                                                                                 action,
-                                                                                                Pnet1[(
-                                                                                                                  episode * n_points) + step])  # Take action, get new state and reward
+                                                                                                Pnet1[(episode * n_points) + step])  # Take action, get new state and reward
         new_state_hist[(episode * n_points) + step] = new_state
 
         agent.update(old_state, new_state, action, reward, indicat)  # Let the agent update internals
